@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": false,
+    "outDir": "./lib/cjs",
+    "verbatimModuleSyntax": false,
+    "noEmit": false
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,68 @@
+{
+  "name": "mtn-momo-sdk",
+  "version": "0.1.0",
+  "description": "MTN Mobile Money API Client for NodeJS written in TypeScript",
+  "type": "module",
+  "main": "./lib/cjs/index.js",
+  "module": "./lib/esm/index.js",
+  "types": "./lib/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./lib/esm/index.d.ts",
+        "default": "./lib/esm/index.js"
+      },
+      "require": {
+        "types": "./lib/cjs/index.d.ts",
+        "default": "./lib/cjs/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "clean": "rm -rf lib",
+    "typecheck": "bunx tsc -p tsconfig.typecheck.json",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build": "bun run clean && bun run build:esm && bun run build:cjs && mkdir -p lib/esm lib/cjs && echo '{\"type\":\"module\"}' > lib/esm/package.json && echo '{\"type\":\"commonjs\"}' > lib/cjs/package.json",
+    "test": "NODE_ENV=test vitest run",
+    "test:integration": "vitest run test/integration.test.ts",
+    "test:watch": "NODE_ENV=test vitest",
+    "test:coverage": "NODE_ENV=test vitest run --coverage",
+    "example:collections": "bun examples/collections.ts",
+    "example:collections:extended": "bun examples/collections-extended.ts",
+    "example:disbursements": "bun examples/disbursements.ts",
+    "example:disbursements:v2": "bun examples/disbursements-v2.ts",
+    "example:remittance": "bun examples/remittance.ts",
+    "example:users": "bun examples/users.ts"
+  },
+  "keywords": [
+    "MTN",
+    "Mobile",
+    "Money",
+    "Momo",
+    "TypeScript",
+    "NodeJS",
+    "Payment",
+    "API"
+  ],
+  "bin": {
+    "momo-sandbox": "./lib/cjs/cli.js"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.13.6",
+    "commander": "^14.0.3",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@vitest/coverage-v8": "^4.1.1",
+    "axios-mock-adapter": "^2.1.0",
+    "dotenv": "^17.3.1",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.1"
+  },
+  "files": [
+    "lib"
+  ]
+}

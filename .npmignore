@@ -1,0 +1,33 @@
+# Development Sources
+src/
+test/
+examples/
+docs/
+
+# Configuration and Tooling
+tsconfig*.json
+vitest.config.ts
+.env
+.env.*
+.DS_Store
+Thumbs.db
+.npm/
+.cache/
+temp/
+tmp/
+
+# Logs and Coverage
+*.log
+coverage/
+.nyc_output/
+
+# Diagnostic Files
+*.txt
+*.txt.txt
+API_IMPLEMENTATION_STATUS.md
+
+# Dependencies
+node_modules/
+bun.lockb
+package-lock.json
+yarn.lock
