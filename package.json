@@ -46,7 +46,7 @@
     "API"
   ],
   "bin": {
-    "momo-sandbox": "./lib/cjs/cli.js"
+    "momo-sandbox": "lib/cjs/cli.js"
   },
   "license": "ISC",
   "dependencies": {
