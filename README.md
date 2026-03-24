@@ -1,4 +1,4 @@
-# MTN MoMo Node SDK (mtn-momo-sdk)
+# MTN MoMo Node SDK (@maxkabechani/mtn-momo-sdk)
 
 TypeScript-first MTN Mobile Money client for Node.js. Fully compatible with official MoMo API v1.0 and v2.0.
 
@@ -18,9 +18,9 @@ This SDK provides a type-safe, developer-friendly interface for integrating MTN 
 ## Installation
 
 ```bash
-npm install mtn-momo-sdk
+npm install @maxkabechani/mtn-momo-sdk
 # or
-bun add mtn-momo-sdk
+bun add @maxkabechani/mtn-momo-sdk
 ```
 
 ---
@@ -29,7 +29,7 @@ bun add mtn-momo-sdk
 
 ### 1. Initialize the Client
 ```ts
-import { create, Environment } from "mtn-momo-sdk";
+import { create, Environment } from "@maxkabechani/mtn-momo-sdk";
 
 const momo = create({
   callbackHost: "yourdomain.com", // Used for callback validation
