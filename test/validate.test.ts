@@ -3,6 +3,7 @@ import { v4 as uuid } from "uuid";
 import { expect } from "vitest";
 
 import type { PaymentRequest } from "../src/collections";
+import type { WithdrawalRequest, DepositRequest, RefundRequest } from "../src/common";
 
 import {
   Environment,
@@ -19,6 +20,9 @@ import {
   validateSubscriptionConfig,
   validateTransfer,
   validateUserConfig,
+  validateWithdrawalRequest,
+  validateDepositRequest,
+  validateRefundRequest,
 } from "../src/validate";
 
 describe("Validate", function () {
@@ -377,6 +381,72 @@ describe("Validate", function () {
         } as TransferRequest;
         await expect(validateTransfer(request)).resolves.toBeUndefined();
       });
+    });
+  });
+
+  describe("validateWithdrawalRequest", function () {
+    it("rejects when amount is missing", async function () {
+      await expect(validateWithdrawalRequest({} as WithdrawalRequest)).rejects.toThrowError("amount is required");
+    });
+
+    it("rejects when amount is not numeric", async function () {
+      await expect(validateWithdrawalRequest({ amount: "abc" } as WithdrawalRequest)).rejects.toThrowError("amount must be a number");
+    });
+
+    it("rejects when currency is missing", async function () {
+      await expect(validateWithdrawalRequest({ amount: "100" } as WithdrawalRequest)).rejects.toThrowError("currency is required");
+    });
+
+    it("rejects when payee is missing", async function () {
+      await expect(validateWithdrawalRequest({ amount: "100", currency: "EUR" } as WithdrawalRequest)).rejects.toThrowError("payee is required");
+    });
+
+    it("fulfills for a valid request", async function () {
+      await expect(validateWithdrawalRequest({
+        amount: "100",
+        currency: "EUR",
+        payee: { partyIdType: PartyIdType.MSISDN, partyId: "12345" },
+      })).resolves.toBeUndefined();
+    });
+  });
+
+  describe("validateDepositRequest", function () {
+    it("rejects when amount is missing", async function () {
+      await expect(validateDepositRequest({} as DepositRequest)).rejects.toThrowError("amount is required");
+    });
+
+    it("rejects when payee is missing", async function () {
+      await expect(validateDepositRequest({ amount: "100", currency: "EUR" } as DepositRequest)).rejects.toThrowError("payee is required");
+    });
+
+    it("fulfills for a valid request", async function () {
+      await expect(validateDepositRequest({
+        amount: "100",
+        currency: "EUR",
+        payee: { partyIdType: PartyIdType.MSISDN, partyId: "12345" },
+      })).resolves.toBeUndefined();
+    });
+  });
+
+  describe("validateRefundRequest", function () {
+    it("rejects when referenceIdToRefund is missing", async function () {
+      await expect(validateRefundRequest({} as RefundRequest)).rejects.toThrowError("referenceIdToRefund is required");
+    });
+
+    it("rejects when referenceIdToRefund is not a valid uuid", async function () {
+      await expect(validateRefundRequest({ referenceIdToRefund: "bad" } as RefundRequest)).rejects.toThrowError("referenceIdToRefund must be a valid uuid v4");
+    });
+
+    it("rejects when amount is missing", async function () {
+      await expect(validateRefundRequest({ referenceIdToRefund: uuid() } as RefundRequest)).rejects.toThrowError("amount is required");
+    });
+
+    it("fulfills for a valid request", async function () {
+      await expect(validateRefundRequest({
+        referenceIdToRefund: uuid(),
+        amount: "100",
+        currency: "EUR",
+      })).resolves.toBeUndefined();
     });
   });
 });

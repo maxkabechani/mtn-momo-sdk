@@ -65,6 +65,12 @@ describe("Remittance", function () {
         "/remittance/v1_0/transfer/reference",
       );
     });
+
+    it("rejects with error when transaction has FAILED status", async function () {
+      await expect(
+        remittance.getTransaction("failed"),
+      ).rejects.toThrow();
+    });
   });
 
   describe("getBalance", function () {
@@ -118,6 +124,7 @@ describe("Remittance", function () {
       expect(mockAdapter.history.get[0]!.url).toBe("/remittance/oauth2/v1_0/userinfo");
     });
   });
+
   describe("bcAuthorize", function () {
     it("makes the correct request", async function () {
       const request = { 
@@ -135,6 +142,62 @@ describe("Remittance", function () {
       expect(mockAdapter.history.post[0]!.data).toContain("scope=profile");
       // Check for Basic Auth header
       expect(mockAdapter.history.post[0]!.headers?.Authorization).toMatch(/^Basic /);
+    });
+  });
+
+  describe("cashTransfer", function () {
+    it("makes the correct request to v2 endpoint", async function () {
+      const request: CashTransferRequest = {
+        amount: "100",
+        currency: "EUR",
+        externalId: "ct-123",
+        payee: {
+          partyIdType: PartyIdType.MSISDN,
+          partyId: "256774290781",
+        },
+        payerMessage: "cash transfer",
+        payeeNote: "v2 note",
+      };
+      await expect(
+        remittance.cashTransfer({ ...request, callbackUrl: "cb-url" }),
+      ).resolves.toBeTypeOf("string");
+      expect(mockAdapter.history.post).toHaveLength(1);
+      expect(mockAdapter.history.post[0]!.url).toBe(
+        "/remittance/v2_0/cashtransfer",
+      );
+      expect(mockAdapter.history.post[0]!.headers!["X-Reference-Id"]).toBeTypeOf("string");
+      expect(mockAdapter.history.post[0]!.headers!["X-Callback-Url"]).toBe("cb-url");
+    });
+  });
+
+  describe("getCashTransfer", function () {
+    it("makes the correct request", async function () {
+      await expect(
+        remittance.getCashTransfer("reference"),
+      ).resolves.toBeDefined();
+      expect(mockAdapter.history.get).toHaveLength(1);
+      expect(mockAdapter.history.get[0]!.url).toBe(
+        "/remittance/v2_0/cashtransfer/reference",
+      );
+    });
+
+    it("rejects with error when cash transfer has FAILED status", async function () {
+      await expect(
+        remittance.getCashTransfer("failed"),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("getOAuth2Token", function () {
+    it("makes the correct request", async function () {
+      await expect(
+        remittance.getOAuth2Token({ grant_type: "urn:openid:params:grant-type:ciba", auth_req_id: "auth-123" }),
+      ).resolves.toBeDefined();
+      expect(mockAdapter.history.post).toHaveLength(1);
+      expect(mockAdapter.history.post[0]!.url).toBe(
+        "/remittance/oauth2/token/",
+      );
+      expect(mockAdapter.history.post[0]!.data).toContain("auth_req_id=auth-123");
     });
   });
 });

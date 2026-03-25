@@ -26,6 +26,7 @@ export type {
   BasicUserInfo,
   BcAuthorizeRequest,
   BcAuthorizeResponse,
+  OAuth2TokenRequest,
   OAuth2TokenResponse,
   ConsentKycResponse,
   DeliveryNotification,
@@ -97,6 +98,8 @@ export function create(globalConfig: GlobalConfig): MomoClient {
     },
 
     Disbursements(productConfig: ProductConfig): Disbursements {
+      validateProductConfig(productConfig);
+
       const config: Config = {
         ...defaultGlobalConfig,
         ...globalConfig,
@@ -112,6 +115,8 @@ export function create(globalConfig: GlobalConfig): MomoClient {
     },
 
     Remittance(productConfig: ProductConfig): Remittance {
+      validateProductConfig(productConfig);
+
       const config: Config = {
         ...defaultGlobalConfig,
         ...globalConfig,

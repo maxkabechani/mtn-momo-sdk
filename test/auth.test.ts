@@ -3,6 +3,7 @@ import { expect, vi } from "vitest";
 import {
   authorizeCollections,
   authorizeDisbursements,
+  authorizeRemittance,
   createBasicAuthToken,
   createTokenRefresher,
 } from "../src/auth";
@@ -70,6 +71,20 @@ describe("Auth", function () {
       ).resolves.toBeDefined();
       expect(mockAdapter.history.post).toHaveLength(1);
       expect(mockAdapter.history.post[0]?.url).toBe("/disbursement/token/");
+      expect(mockAdapter.history.post[0]?.headers?.Authorization).toBe(
+        "Basic " + Buffer.from("id:secret").toString("base64"),
+      );
+    });
+  });
+
+  describe("authorizeRemittance", function () {
+    it("makes the correct request", async function () {
+      const [mockClient, mockAdapter] = createMock();
+      await expect(
+        authorizeRemittance(config, undefined, mockClient),
+      ).resolves.toBeDefined();
+      expect(mockAdapter.history.post).toHaveLength(1);
+      expect(mockAdapter.history.post[0]?.url).toBe("/remittance/token/");
       expect(mockAdapter.history.post[0]?.headers?.Authorization).toBe(
         "Basic " + Buffer.from("id:secret").toString("base64"),
       );

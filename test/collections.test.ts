@@ -134,6 +134,12 @@ describe("Collections", function () {
         "/collection/v1_0/requesttopay/reference",
       );
     });
+
+    it("rejects with error when transaction has FAILED status", async function () {
+      await expect(
+        collections.getTransaction("failed"),
+      ).rejects.toThrow();
+    });
   });
 
   describe("getBalance", function () {
@@ -203,10 +209,16 @@ describe("Collections", function () {
         "/collection/v1_0/requesttowithdraw/ref1",
       );
     });
+
+    it("rejects with error when withdrawal has FAILED status", async function () {
+      await expect(
+        collections.getWithdrawal("failed"),
+      ).rejects.toThrow();
+    });
   });
 
   describe("sendDeliveryNotification", function () {
-    it("makes the correct request", async function () {
+    it("sends notificationMessage as a header", async function () {
       await expect(
         collections.sendDeliveryNotification("ref1", {
           notificationMessage: "Delivered",
@@ -216,9 +228,22 @@ describe("Collections", function () {
       expect(mockAdapter.history.post[0]?.url).toBe(
         "/collection/v1_0/requesttopay/ref1/deliverynotification",
       );
-      expect(mockAdapter.history.post[0]?.data).toBe(
-        JSON.stringify({ notificationMessage: "Delivered" }),
+      // notificationMessage should be a header, not a body
+      expect(mockAdapter.history.post[0]?.headers?.notificationMessage).toBe(
+        "Delivered",
       );
+      // Body should be null (not contain notificationMessage as JSON)
+      expect(mockAdapter.history.post[0]?.data).not.toContain("notificationMessage");
+    });
+
+    it("includes Language header when specified", async function () {
+      await expect(
+        collections.sendDeliveryNotification("ref1", {
+          notificationMessage: "Delivered",
+          language: "en",
+        }),
+      ).resolves.toBeUndefined();
+      expect(mockAdapter.history.post[0]?.headers?.Language).toBe("en");
     });
   });
 
@@ -259,6 +284,43 @@ describe("Collections", function () {
       // Check if it's urlencoded
       expect(mockAdapter.history.post[0]?.data).toContain("login_hint=ID%3A12345%2FMSISDN");
       expect(mockAdapter.history.post[0]?.data).toContain("scope=profile");
+    });
+
+    it("includes optional params when specified", async function () {
+      const request = { 
+        login_hint: "ID:12345/MSISDN", 
+        scope: "profile", 
+        access_type: "online" as const,
+        client_notification_token: "notify-token",
+        scope_instruction: "do consent",
+      };
+      await expect(collections.bcAuthorize(request)).resolves.toBeDefined();
+      expect(mockAdapter.history.post[0]?.data).toContain("client_notification_token=notify-token");
+      expect(mockAdapter.history.post[0]?.data).toContain("scope_instruction=do+consent");
+    });
+  });
+
+  describe("getUserInfoWithConsent", function () {
+    it("makes the correct request", async function () {
+      await expect(collections.getUserInfoWithConsent()).resolves.toBeDefined();
+      expect(mockAdapter.history.get).toHaveLength(1);
+      expect(mockAdapter.history.get[0]?.url).toBe(
+        "/collection/oauth2/v1_0/userinfo",
+      );
+    });
+  });
+
+  describe("getOAuth2Token", function () {
+    it("makes the correct request", async function () {
+      await expect(
+        collections.getOAuth2Token({ grant_type: "urn:openid:params:grant-type:ciba", auth_req_id: "auth-123" }),
+      ).resolves.toBeDefined();
+      expect(mockAdapter.history.post).toHaveLength(1);
+      expect(mockAdapter.history.post[0]?.url).toBe(
+        "/collection/oauth2/token/",
+      );
+      expect(mockAdapter.history.post[0]?.data).toContain("grant_type=");
+      expect(mockAdapter.history.post[0]?.data).toContain("auth_req_id=auth-123");
     });
   });
 });

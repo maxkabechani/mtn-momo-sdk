@@ -35,6 +35,24 @@ describe("MomoClient", function () {
           typeof momo.create({ callbackHost: "example.com" }).Disbursements,
         ).toBe("function");
       });
+
+      it("returns a creator for Remittance client", function () {
+        expect(momo.create({ callbackHost: "example.com" })).toHaveProperty(
+          "Remittance",
+        );
+        expect(
+          typeof momo.create({ callbackHost: "example.com" }).Remittance,
+        ).toBe("function");
+      });
+
+      it("returns a creator for Users client", function () {
+        expect(momo.create({ callbackHost: "example.com" })).toHaveProperty(
+          "Users",
+        );
+        expect(
+          typeof momo.create({ callbackHost: "example.com" }).Users,
+        ).toBe("function");
+      });
     });
   });
 });

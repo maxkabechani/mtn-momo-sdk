@@ -8,11 +8,13 @@ import type {
   CashTransfer,
   CashTransferRequest,
   ConsentKycResponse,
+  OAuth2TokenRequest,
+  OAuth2TokenResponse,
   Party,
   ProductConfig,
 } from "./common";
 import { TransactionStatus, PartyIdType } from "./common";
-import { MtnMoMoError } from "./errors";
+import { getTransactionError, MtnMoMoError } from "./errors";
 import { createBasicAuthToken } from "./auth";
 import type { Config } from "./common";
 
@@ -37,7 +39,7 @@ export default class Remittance {
    */
   async transfer(request: CashTransferRequest): Promise<string> {
     const referenceId = uuid();
-    const response = await this.client.post(
+    await this.client.post(
       `/remittance/v1_0/transfer`,
       {
         amount: request.amount,
@@ -61,12 +63,7 @@ export default class Remittance {
       },
     );
 
-    // In MoMo API, a 202 Accepted means the request was received successfully.
-    // The reference ID is what we supplied in the header.
-    if (response.status === 202) {
-      return referenceId;
-    }
-    throw new MtnMoMoError("Failed to retrieve transfer reference ID");
+    return referenceId;
   }
 
   /**
@@ -75,17 +72,16 @@ export default class Remittance {
    * @returns A promise that resolves to the transfer details and status
    */
   async getTransaction(referenceId: string): Promise<CashTransfer> {
-    const response = await this.client.get(
+    const response = await this.client.get<CashTransfer>(
       `/remittance/v1_0/transfer/${referenceId}`,
     );
 
-    if (response.status !== 200) {
-      throw new MtnMoMoError(
-        `Failed to retrieve transfer: ${response.data?.message || "Unknown error"}`,
-      );
+    const transaction = response.data;
+    if (transaction.status === TransactionStatus.FAILED) {
+      return Promise.reject(getTransactionError(transaction));
     }
 
-    return response.data;
+    return transaction;
   }
 
   /**
@@ -93,15 +89,9 @@ export default class Remittance {
    * @returns A promise that resolves to the account balance with currency information
    */
   async getBalance(): Promise<Balance> {
-    const response = await this.client.get(`/remittance/v1_0/account/balance`);
-
-    if (response.status !== 200) {
-      throw new MtnMoMoError(
-        `Failed to retrieve balance: ${response.data?.message || "Unknown error"}`,
-      );
-    }
-
-    return response.data;
+    return this.client
+      .get<Balance>(`/remittance/v1_0/account/balance`)
+      .then((response) => response.data);
   }
 
   /**
@@ -114,7 +104,6 @@ export default class Remittance {
     partyId: string,
     partyIdType: PartyIdType = PartyIdType.MSISDN,
   ): Promise<boolean> {
-    const type = String(partyIdType);
     try {
       const response = await this.client.get(
         `/remittance/v1_0/accountholder/${partyIdType}/${partyId}/active`,
@@ -160,17 +149,19 @@ export default class Remittance {
    * Requires prior OAuth2 user consent/login flow to obtain authorization
    * @returns A promise that resolves to the user's information and KYC consent details
    */
-  async getUserInfoWithConsent(): Promise<ConsentKycResponse> {
-    const response = await this.client.get(`/remittance/oauth2/v1_0/userinfo`);
-
-    if (response.status !== 200) {
-      throw new MtnMoMoError(
-        `Failed to retrieve user info: ${response.data?.message || "Unknown error"}`,
-      );
-    }
-
-    return response.data;
+  public getUserInfoWithConsent(): Promise<ConsentKycResponse> {
+    return this.client
+      .get<ConsentKycResponse>(`/remittance/oauth2/v1_0/userinfo`)
+      .then((response) => response.data);
   }
+
+  /**
+   * Request Biometric Consent (BC) authorization.
+   * This initiates the BC authorization flow for enhanced security.
+   *
+   * @param request The BC authorization request
+   * @returns A promise that resolves to the BC authorization response with auth_req_id
+   */
   public bcAuthorize(
     request: BcAuthorizeRequest,
   ): Promise<BcAuthorizeResponse> {
@@ -181,6 +172,12 @@ export default class Remittance {
     if (request.consent_valid_in) {
       params.append("consent_valid_in", String(request.consent_valid_in));
     }
+    if (request.client_notification_token) {
+      params.append("client_notification_token", request.client_notification_token);
+    }
+    if (request.scope_instruction) {
+      params.append("scope_instruction", request.scope_instruction);
+    }
 
     const basicAuthToken: string = createBasicAuthToken(this.config);
 
@@ -188,6 +185,82 @@ export default class Remittance {
       .post<BcAuthorizeResponse>("/remittance/v1_0/bc-authorize", params, {
         headers: {
           Authorization: `Basic ${basicAuthToken}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      })
+      .then((response) => response.data);
+  }
+
+  /**
+   * Send a cross-border cash transfer (V2).
+   * Uses the v2_0 cashtransfer endpoint.
+   *
+   * @param request The cash transfer request details
+   * @returns A promise that resolves to the reference ID
+   */
+  public cashTransfer(request: CashTransferRequest): Promise<string> {
+    const referenceId = uuid();
+
+    return this.client
+      .post<void>(
+        "/remittance/v2_0/cashtransfer",
+        {
+          amount: request.amount,
+          currency: request.currency,
+          externalId: request.externalId,
+          payee: request.payee,
+          originatingCountry: request.originatingCountry,
+          originalAmount: request.originalAmount,
+          originalCurrency: request.originalCurrency,
+          payerMessage: request.payerMessage,
+          payeeNote: request.payeeNote,
+        },
+        {
+          headers: {
+            "X-Reference-Id": referenceId,
+            ...(request.callbackUrl
+              ? { "X-Callback-Url": request.callbackUrl }
+              : {}),
+          },
+        },
+      )
+      .then(() => referenceId);
+  }
+
+  /**
+   * Get the details and status of a cash transfer (V2).
+   *
+   * @param referenceId The cash transfer reference ID
+   * @returns A promise that resolves to the cash transfer details
+   */
+  public getCashTransfer(referenceId: string): Promise<CashTransfer> {
+    return this.client
+      .get<CashTransfer>(`/remittance/v2_0/cashtransfer/${referenceId}`)
+      .then((response) => response.data)
+      .then((transfer) => {
+        if (transfer.status === TransactionStatus.FAILED) {
+          return Promise.reject(getTransactionError(transfer));
+        }
+        return transfer;
+      });
+  }
+
+  /**
+   * Create an OAuth2 token for consent-based access.
+   *
+   * @param request The OAuth2 token request parameters
+   * @returns A promise that resolves to the OAuth2 token response
+   */
+  public getOAuth2Token(
+    request: OAuth2TokenRequest,
+  ): Promise<OAuth2TokenResponse> {
+    const params = new URLSearchParams();
+    params.append("grant_type", request.grant_type);
+    params.append("auth_req_id", request.auth_req_id);
+
+    return this.client
+      .post<OAuth2TokenResponse>("/remittance/oauth2/token/", params, {
+        headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
       })

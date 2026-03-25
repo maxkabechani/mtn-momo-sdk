@@ -230,6 +230,7 @@ export interface Withdrawal {
  */
 export interface DeliveryNotification {
   notificationMessage: string;
+  language?: string;
 }
 
 /**
@@ -242,6 +243,14 @@ export interface BcAuthorizeRequest {
   consent_valid_in?: number;
   client_notification_token?: string;
   scope_instruction?: string;
+}
+
+/**
+ * OAuth2 token request parameters for consent-based flows
+ */
+export interface OAuth2TokenRequest {
+  grant_type: string;
+  auth_req_id: string;
 }
 
 /**

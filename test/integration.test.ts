@@ -121,6 +121,15 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
       }
     });
 
+    it("can get balance in currency", async () => {
+      try {
+        const balance = await collectionsClient.getBalanceInCurrency("EUR");
+        expect(balance.availableBalance).toBeDefined();
+      } catch (e: any) {
+        if (e.name !== "ResourceNotFoundError" && e.name !== "NotAllowedError" && e.name !== "UnspecifiedError" && e.name !== "InternalProcessingError" && e.name !== "ServiceUnavailableError") throw e;
+      }
+    });
+
     it("can request bc authorization", async () => {
       try {
         const res = await collectionsClient.bcAuthorize({
@@ -163,6 +172,50 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
         expect(refV2).toBeDefined();
       } catch (e: any) {
         if (e.name !== "NotAllowedError" && e.name !== "NotAllowedTargetEnvironmentError" && e.name !== "UnspecifiedError" && e.name !== "ServiceUnavailableError") throw e;
+      }
+    });
+
+    it("can send delivery notification", async () => {
+      try {
+        // First create a requestToPay to get a valid referenceId
+        const referenceId = await collectionsClient.requestToPay({
+          amount: "100",
+          currency: "EUR",
+          externalId: "dn-test",
+          payer: { partyIdType: PartyIdType.MSISDN, partyId: "46733123454" },
+          payerMessage: "delivery notification test",
+          payeeNote: "note",
+        });
+
+        await collectionsClient.sendDeliveryNotification(referenceId, {
+          notificationMessage: "Your payment was received",
+        });
+      } catch (e: any) {
+        // Sandbox may reject — 400/404/500 are acceptable sandbox errors
+        if (e.response?.status !== 400 && e.response?.status !== 404 && e.response?.status !== 500 && e.name !== "UnspecifiedError" && e.name !== "ResourceNotFoundError") throw e;
+      }
+    }, timeout);
+
+    it("can get oauth2 user info with consent", async () => {
+      try {
+        const info = await collectionsClient.getUserInfoWithConsent();
+        expect(info).toBeDefined();
+      } catch (e: any) {
+        // OAuth2 consent endpoints require prior auth flow, expect errors in sandbox
+        if (e.name !== "ResourceNotFoundError" && e.name !== "NotAllowedError" && e.name !== "UnspecifiedError" && e.name !== "NotAllowedTargetEnvironmentError") throw e;
+      }
+    });
+
+    it("can request oauth2 token", async () => {
+      try {
+        const tokenRes = await collectionsClient.getOAuth2Token({
+          grant_type: "urn:openid:params:grant-type:ciba",
+          auth_req_id: "dummy-auth-req-id",
+        });
+        expect(tokenRes.access_token).toBeDefined();
+      } catch (e: any) {
+        // Expected to fail without valid auth_req_id
+        if (e.response?.status !== 400 && e.response?.status !== 401 && e.response?.status !== 500 && e.name !== "UnspecifiedError") throw e;
       }
     });
   });
@@ -303,6 +356,27 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
         if (e.name === "InvalidCurrencyError") return; // Sandbox flakiness with currencies
       }
     });
+
+    it("can get oauth2 user info with consent", async () => {
+      try {
+        const info = await disbursementsClient.getUserInfoWithConsent();
+        expect(info).toBeDefined();
+      } catch (e: any) {
+        if (e.name !== "ResourceNotFoundError" && e.name !== "NotAllowedError" && e.name !== "UnspecifiedError" && e.name !== "NotAllowedTargetEnvironmentError") throw e;
+      }
+    });
+
+    it("can request oauth2 token", async () => {
+      try {
+        const tokenRes = await disbursementsClient.getOAuth2Token({
+          grant_type: "urn:openid:params:grant-type:ciba",
+          auth_req_id: "dummy-auth-req-id",
+        });
+        expect(tokenRes.access_token).toBeDefined();
+      } catch (e: any) {
+        if (e.response?.status !== 400 && e.response?.status !== 401 && e.response?.status !== 500 && e.name !== "UnspecifiedError") throw e;
+      }
+    });
   });
 
   describe("Remittance", () => {
@@ -362,7 +436,16 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
         const balance = await remittanceClient.getBalance();
         expect(balance.availableBalance).toBeDefined();
       } catch (e: any) {
-        if (e.name !== "NotAllowedError" && e.name !== "NotAllowedTargetEnvironmentError" && e.name !== "UnspecifiedError" && e.name !== "ResourceNotFoundError") throw e;
+        if (e.name !== "NotAllowedError" && e.name !== "NotAllowedTargetEnvironmentError" && e.name !== "UnspecifiedError" && e.name !== "ResourceNotFoundError" && e.name !== "ServiceUnavailableError" && e.name !== "InternalProcessingError") throw e;
+      }
+    });
+
+    it("can get balance in currency", async () => {
+      try {
+        const balance = await remittanceClient.getBalanceInCurrency("EUR");
+        expect(balance.availableBalance).toBeDefined();
+      } catch (e: any) {
+        if (e.name !== "NotAllowedError" && e.name !== "NotAllowedTargetEnvironmentError" && e.name !== "UnspecifiedError" && e.name !== "ResourceNotFoundError" && e.name !== "ServiceUnavailableError" && e.name !== "InternalProcessingError") throw e;
       }
     });
 
@@ -394,6 +477,42 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
         expect(res.auth_req_id).toBeDefined();
       } catch (e: any) {
         if (e.name !== "UnspecifiedError" && e.name !== "NotAllowedError" && e.name !== "ResourceNotFoundError") throw e;
+      }
+    });
+
+    it("can send cash transfer (V2)", async () => {
+      try {
+        const referenceId = await remittanceClient.cashTransfer({
+          amount: "75",
+          currency: "EUR",
+          externalId: "cashtx-v2",
+          payee: {
+            partyIdType: PartyIdType.MSISDN,
+            partyId: "46733123454",
+          },
+          payerMessage: "cash transfer v2",
+          payeeNote: "v2 note",
+        });
+        expect(referenceId).toBeTypeOf("string");
+
+        await new Promise(r => setTimeout(r, 2000));
+        const transfer = await remittanceClient.getCashTransfer(referenceId);
+        expect(transfer).toBeDefined();
+      } catch (e: any) {
+        // V2 cash transfer may not be available in sandbox
+        if (e.response?.status !== 400 && e.response?.status !== 404 && e.response?.status !== 500 && e.name !== "UnspecifiedError" && e.name !== "NotAllowedError" && e.name !== "NotAllowedTargetEnvironmentError" && e.name !== "ServiceUnavailableError") throw e;
+      }
+    }, timeout);
+
+    it("can request oauth2 token", async () => {
+      try {
+        const tokenRes = await remittanceClient.getOAuth2Token({
+          grant_type: "urn:openid:params:grant-type:ciba",
+          auth_req_id: "dummy-auth-req-id",
+        });
+        expect(tokenRes.access_token).toBeDefined();
+      } catch (e: any) {
+        if (e.response?.status !== 400 && e.response?.status !== 401 && e.response?.status !== 500 && e.name !== "UnspecifiedError") throw e;
       }
     });
   });

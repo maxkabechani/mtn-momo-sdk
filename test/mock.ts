@@ -33,6 +33,8 @@ export function createMock(): [AxiosInstance, MockAdapter] {
     },
   });
 
+  // ── Collections ──
+
   mock.onPost("/collection/token/").reply(200, {
     access_token: "token",
     token_type: "access_token",
@@ -44,6 +46,21 @@ export function createMock(): [AxiosInstance, MockAdapter] {
     .reply(200, { result: true });
 
   mock.onPost("/collection/v1_0/requesttopay").reply(201);
+
+  mock.onGet(/\/collection\/v1_0\/requesttopay\/failed/).reply(200, {
+    financialTransactionId: "tx id",
+    externalId: "string",
+    amount: "2000",
+    currency: "UGX",
+    payer: {
+      partyIdType: "MSISDN",
+      partyId: "256772000000",
+    },
+    payerMessage: "test",
+    payeeNote: "test",
+    status: "FAILED",
+    reason: "PAYER_NOT_FOUND",
+  } as Payment);
 
   mock.onGet(/\/collection\/v1_0\/requesttopay\/[\w\-]+/).reply(200, {
     financialTransactionId: "tx id",
@@ -72,6 +89,19 @@ export function createMock(): [AxiosInstance, MockAdapter] {
   mock.onPost("/collection/v1_0/requesttowithdraw").reply(201);
   mock.onPost("/collection/v2_0/requesttowithdraw").reply(201);
 
+  mock.onGet(/\/collection\/v1_0\/requesttowithdraw\/failed/).reply(200, {
+    financialTransactionId: "tx id",
+    externalId: "string",
+    amount: "2000",
+    currency: "UGX",
+    payee: {
+      partyIdType: "MSISDN",
+      partyId: "256772000000",
+    },
+    status: "FAILED",
+    reason: "PAYER_NOT_FOUND",
+  });
+
   mock.onGet(/\/collection\/v1_0\/requesttowithdraw\/[\w\-]+/).reply(200, {
     financialTransactionId: "tx id",
     externalId: "string",
@@ -96,6 +126,21 @@ export function createMock(): [AxiosInstance, MockAdapter] {
     interval: 5,
     expires_in: 600
   });
+
+  mock.onGet("/collection/oauth2/v1_0/userinfo").reply(200, {
+    sub: "user-123",
+    name: "Test User",
+    phone_number: "256772000000",
+    status: "ACTIVE",
+  });
+
+  mock.onPost("/collection/oauth2/token/").reply(200, {
+    access_token: "consent-token",
+    token_type: "Bearer",
+    expires_in: 3600,
+  });
+
+  // ── Disbursements ──
 
   mock.onPost("/disbursement/token/").reply(200, {
     access_token: "token",
@@ -123,6 +168,19 @@ export function createMock(): [AxiosInstance, MockAdapter] {
   mock.onPost("/disbursement/v1_0/refund").reply(202);
   mock.onPost("/disbursement/v2_0/refund").reply(202);
 
+  mock.onGet(/\/disbursement\/v1_0\/transfer\/failed/).reply(200, {
+    financialTransactionId: "tx id",
+    externalId: "string",
+    amount: "2000",
+    currency: "UGX",
+    payee: {
+      partyIdType: "MSISDN",
+      partyId: "256772000000",
+    },
+    status: "FAILED",
+    reason: "PAYER_NOT_FOUND",
+  } as Transfer);
+
   mock.onGet(/\/disbursement\/v1_0\/transfer\/[\w\-]+/).reply(200, {
     financialTransactionId: "tx id",
     externalId: "string",
@@ -135,6 +193,19 @@ export function createMock(): [AxiosInstance, MockAdapter] {
     status: "SUCCESSFUL",
   } as Transfer);
 
+  mock.onGet(/\/disbursement\/v1_0\/deposit\/failed/).reply(200, {
+    financialTransactionId: "tx id",
+    externalId: "string",
+    amount: "2000",
+    currency: "UGX",
+    payee: {
+      partyIdType: "MSISDN",
+      partyId: "256772000000",
+    },
+    status: "FAILED",
+    reason: "PAYER_NOT_FOUND",
+  });
+
   mock.onGet(/\/disbursement\/v1_0\/deposit\/[\w\-]+/).reply(200, {
     financialTransactionId: "tx id",
     externalId: "string",
@@ -145,6 +216,19 @@ export function createMock(): [AxiosInstance, MockAdapter] {
       partyId: "256772000000",
     },
     status: "SUCCESSFUL",
+  });
+
+  mock.onGet(/\/disbursement\/v1_0\/refund\/failed/).reply(200, {
+    financialTransactionId: "tx id",
+    externalId: "string",
+    amount: "2000",
+    currency: "UGX",
+    payee: {
+      partyIdType: "MSISDN",
+      partyId: "256772000000",
+    },
+    status: "FAILED",
+    reason: "PAYER_NOT_FOUND",
   });
 
   mock.onGet(/\/disbursement\/v1_0\/refund\/[\w\-]+/).reply(200, {
@@ -180,6 +264,27 @@ export function createMock(): [AxiosInstance, MockAdapter] {
     expires_in: 600
   });
 
+  mock.onGet("/disbursement/oauth2/v1_0/userinfo").reply(200, {
+    sub: "user-123",
+    name: "Test User",
+    phone_number: "256772000000",
+    status: "ACTIVE",
+  });
+
+  mock.onPost("/disbursement/oauth2/token/").reply(200, {
+    access_token: "consent-token",
+    token_type: "Bearer",
+    expires_in: 3600,
+  });
+
+  // ── Remittance ──
+
+  mock.onPost("/remittance/token/").reply(200, {
+    access_token: "token",
+    token_type: "access_token",
+    expires_in: 3600,
+  } as AccessToken);
+
   mock
     .onGet(/\/remittance\/v1_0\/accountholder\/(msisdn|email|party_code)\/\w+\/active/i)
     .reply(200, { result: true });
@@ -187,6 +292,19 @@ export function createMock(): [AxiosInstance, MockAdapter] {
   mock
     .onPost("/remittance/v1_0/transfer")
     .reply(202, {}, { "x-reference-id": "reference-id" });
+
+  mock.onGet(/\/remittance\/v1_0\/transfer\/failed/).reply(200, {
+    financialTransactionId: "tx id",
+    externalId: "string",
+    amount: "2000",
+    currency: "UGX",
+    payee: {
+      partyIdType: "MSISDN",
+      partyId: "256772000000",
+    },
+    status: "FAILED",
+    reason: "PAYER_NOT_FOUND",
+  });
 
   mock.onGet(/\/remittance\/v1_0\/transfer\/[\w\-]+/).reply(200, {
     financialTransactionId: "tx id",
@@ -226,6 +344,39 @@ export function createMock(): [AxiosInstance, MockAdapter] {
     name: "Test User",
     phone_number: "256772000000",
     status: "ACTIVE",
+  });
+
+  mock.onPost("/remittance/v2_0/cashtransfer").reply(202);
+
+  mock.onGet(/\/remittance\/v2_0\/cashtransfer\/failed/).reply(200, {
+    financialTransactionId: "tx id",
+    externalId: "string",
+    amount: "2000",
+    currency: "UGX",
+    payee: {
+      partyIdType: "MSISDN",
+      partyId: "256772000000",
+    },
+    status: "FAILED",
+    reason: "PAYER_NOT_FOUND",
+  });
+
+  mock.onGet(/\/remittance\/v2_0\/cashtransfer\/[\w\-]+/).reply(200, {
+    financialTransactionId: "tx id",
+    externalId: "string",
+    amount: "2000",
+    currency: "UGX",
+    payee: {
+      partyIdType: "MSISDN",
+      partyId: "256772000000",
+    },
+    status: "SUCCESSFUL",
+  });
+
+  mock.onPost("/remittance/oauth2/token/").reply(200, {
+    access_token: "consent-token",
+    token_type: "Bearer",
+    expires_in: 3600,
   });
 
   mock.onPost("/oauth2/v1_0/bc-authorize/confirm").reply(200);

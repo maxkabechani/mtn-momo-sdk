@@ -11,9 +11,12 @@ import {
   type BasicUserInfo,
   type BcAuthorizeRequest,
   type BcAuthorizeResponse,
+  type ConsentKycResponse,
   type Deposit,
   type DepositRequest,
   FailureReason,
+  type OAuth2TokenRequest,
+  type OAuth2TokenResponse,
   PartyIdType,
   type Refund,
   type RefundRequest,
@@ -408,6 +411,12 @@ export default class Disbursements {
     if (request.consent_valid_in) {
       params.append("consent_valid_in", String(request.consent_valid_in));
     }
+    if (request.client_notification_token) {
+      params.append("client_notification_token", request.client_notification_token);
+    }
+    if (request.scope_instruction) {
+      params.append("scope_instruction", request.scope_instruction);
+    }
 
     const basicAuthToken: string = createBasicAuthToken(this.config);
 
@@ -415,6 +424,40 @@ export default class Disbursements {
       .post<BcAuthorizeResponse>("/disbursement/v1_0/bc-authorize", params, {
         headers: {
           Authorization: `Basic ${basicAuthToken}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      })
+      .then((response) => response.data);
+  }
+
+  /**
+   * Retrieve user information with KYC consent (OAuth2-gated endpoint).
+   * Requires prior OAuth2 user consent/login flow to obtain authorization.
+   *
+   * @returns A promise that resolves to the user's information and KYC consent details
+   */
+  public getUserInfoWithConsent(): Promise<ConsentKycResponse> {
+    return this.client
+      .get<ConsentKycResponse>("/disbursement/oauth2/v1_0/userinfo")
+      .then((response) => response.data);
+  }
+
+  /**
+   * Create an OAuth2 token for consent-based access.
+   *
+   * @param request The OAuth2 token request parameters
+   * @returns A promise that resolves to the OAuth2 token response
+   */
+  public getOAuth2Token(
+    request: OAuth2TokenRequest,
+  ): Promise<OAuth2TokenResponse> {
+    const params = new URLSearchParams();
+    params.append("grant_type", request.grant_type);
+    params.append("auth_req_id", request.auth_req_id);
+
+    return this.client
+      .post<OAuth2TokenResponse>("/disbursement/oauth2/token/", params, {
+        headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
       })

@@ -135,6 +135,12 @@ describe("Disbursements", function () {
         "/disbursement/v1_0/transfer/reference",
       );
     });
+
+    it("rejects with error when transaction has FAILED status", async function () {
+      await expect(
+        disbursements.getTransaction("failed"),
+      ).rejects.toThrow();
+    });
   });
 
   describe("getBalance", function () {
@@ -211,6 +217,12 @@ describe("Disbursements", function () {
         "/disbursement/v1_0/deposit/reference",
       );
     });
+
+    it("rejects with error when deposit has FAILED status", async function () {
+      await expect(
+        disbursements.getDeposit("failed"),
+      ).rejects.toThrow();
+    });
   });
 
   describe("refund", function () {
@@ -257,7 +269,14 @@ describe("Disbursements", function () {
         "/disbursement/v1_0/refund/reference",
       );
     });
+
+    it("rejects with error when refund has FAILED status", async function () {
+      await expect(
+        disbursements.getRefund("failed"),
+      ).rejects.toThrow();
+    });
   });
+
   describe("getBasicUserInfo", function () {
     it("makes the correct request", async function () {
       await expect(
@@ -299,6 +318,31 @@ describe("Disbursements", function () {
       expect(mockAdapter.history.post[0]!.data).toContain("scope=profile");
       // Check for Basic Auth header
       expect(mockAdapter.history.post[0]!.headers?.Authorization).toMatch(/^Basic /);
+    });
+  });
+
+  describe("getUserInfoWithConsent", function () {
+    it("makes the correct request", async function () {
+      await expect(
+        disbursements.getUserInfoWithConsent(),
+      ).resolves.toBeDefined();
+      expect(mockAdapter.history.get).toHaveLength(1);
+      expect(mockAdapter.history.get[0]!.url).toBe(
+        "/disbursement/oauth2/v1_0/userinfo",
+      );
+    });
+  });
+
+  describe("getOAuth2Token", function () {
+    it("makes the correct request", async function () {
+      await expect(
+        disbursements.getOAuth2Token({ grant_type: "urn:openid:params:grant-type:ciba", auth_req_id: "auth-123" }),
+      ).resolves.toBeDefined();
+      expect(mockAdapter.history.post).toHaveLength(1);
+      expect(mockAdapter.history.post[0]!.url).toBe(
+        "/disbursement/oauth2/token/",
+      );
+      expect(mockAdapter.history.post[0]!.data).toContain("auth_req_id=auth-123");
     });
   });
 });
