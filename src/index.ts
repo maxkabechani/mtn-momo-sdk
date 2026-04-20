@@ -32,7 +32,7 @@ export type {
   DeliveryNotification,
 } from "./common";
 
-import type { AxiosInstance } from "axios";
+import type { HttpClient } from "./httpClient";
 
 import Collections from "./collections";
 import Disbursements from "./disbursements";
@@ -90,7 +90,7 @@ export function create(globalConfig: GlobalConfig): MomoClient {
         ...productConfig,
       };
 
-      const client: AxiosInstance = createAuthClient(
+      const client: HttpClient = createAuthClient(
         createTokenRefresher(authorizeCollections, config),
         createClient(config),
       );
@@ -106,7 +106,7 @@ export function create(globalConfig: GlobalConfig): MomoClient {
         ...productConfig,
       };
 
-      const client: AxiosInstance = createAuthClient(
+      const client: HttpClient = createAuthClient(
         createTokenRefresher(authorizeDisbursements, config),
         createClient(config),
       );
@@ -123,7 +123,7 @@ export function create(globalConfig: GlobalConfig): MomoClient {
         ...productConfig,
       };
 
-      const client: AxiosInstance = createAuthClient(
+      const client: HttpClient = createAuthClient(
         createTokenRefresher(authorizeRemittance, config),
         createClient(config),
       );
@@ -140,7 +140,7 @@ export function create(globalConfig: GlobalConfig): MomoClient {
         ...subscriptionConfig,
       };
 
-      const client: AxiosInstance = createClient(config);
+      const client: HttpClient = createClient(config);
 
       return new Users(client);
     },

@@ -1,19 +1,114 @@
-import axios from "axios";
-import type { AxiosInstance } from "axios";
-import MockAdapter from "axios-mock-adapter";
+import { vi } from "vitest";
 
 import type { Payment } from "../src/collections";
 import type { AccessToken, Balance, Credentials } from "../src/common";
 import type { Transfer } from "../src/disbursements";
+import { HttpClient } from "../src/httpClient";
 
-export function createMock(): [AxiosInstance, MockAdapter] {
-  const client = axios.create({
+type Replier = {
+  reply: (status: number, data?: any, headers?: any) => void;
+};
+
+export class FetchMockAdapter {
+  private client: HttpClient;
+  private handlers: { method: string, matcher: string | RegExp, response?: any, status?: number, headers?: any }[] = [];
+  public history: Record<string, any[]> = {
+    get: [],
+    post: [],
+    put: [],
+    delete: [],
+    patch: []
+  };
+
+  constructor(client: HttpClient) {
+    this.client = client;
+    
+    global.fetch = vi.fn().mockImplementation(async (url: string | URL | globalThis.Request, init?: RequestInit) => {
+       const method = (init?.method || 'GET').toUpperCase();
+       const urlStr = url.toString();
+       
+       let requestData = init?.body;
+       if (requestData instanceof URLSearchParams) {
+         requestData = requestData.toString();
+       } else if (typeof requestData !== 'string' && requestData !== undefined) {
+         requestData = JSON.stringify(requestData);
+       }
+       
+       this.history[method.toLowerCase()].push({
+          url: urlStr.replace(this.client.defaults.baseURL || "", ""),
+          data: requestData,
+          headers: init?.headers,
+          method: method
+       });
+       
+       const handler = this.handlers.find(h => {
+          if (h.method !== method) return false;
+          let path = urlStr;
+          try {
+            const urlObj = new URL(urlStr);
+            path = urlObj.pathname + urlObj.search;
+          } catch(e) {}
+          
+          if (typeof h.matcher === 'string') {
+             return h.matcher === path || h.matcher === urlStr || path.endsWith(h.matcher);
+          } else {
+             return h.matcher.test(path) || h.matcher.test(urlStr);
+          }
+       });
+
+       if (!handler) {
+         return {
+           ok: false,
+           status: 404,
+           statusText: "Not Found",
+           headers: new Headers(),
+           text: async () => "",
+           json: async () => null
+         };
+       }
+       
+       return {
+         ok: handler.status ? handler.status >= 200 && handler.status < 300 : true,
+         status: handler.status || 200,
+         statusText: "OK",
+         headers: new Headers(handler.headers || { "content-type": "application/json" }),
+         text: async () => typeof handler.response === 'string' ? handler.response : JSON.stringify(handler.response),
+         json: async () => handler.response
+       };
+    });
+  }
+
+  public resetHistory() {
+     this.history = { get: [], post: [], put: [], delete: [], patch: [] };
+  }
+
+  private addHandler(method: string, matcher: string | RegExp): Replier {
+     const handler = { method, matcher, status: 200, response: undefined, headers: undefined };
+     this.handlers.push(handler);
+     return {
+       reply: (status: number, data?: any, headers?: any) => {
+         handler.status = status;
+         handler.response = data;
+         handler.headers = headers;
+       }
+     };
+  }
+
+  onGet(matcher: string | RegExp) { return this.addHandler('GET', matcher); }
+  onPost(matcher: string | RegExp) { return this.addHandler('POST', matcher); }
+  onPut(matcher: string | RegExp) { return this.addHandler('PUT', matcher); }
+  onDelete(matcher: string | RegExp) { return this.addHandler('DELETE', matcher); }
+  onPatch(matcher: string | RegExp) { return this.addHandler('PATCH', matcher); }
+}
+
+export function createMock(): [HttpClient, FetchMockAdapter] {
+  const client = new HttpClient({
     headers: {
       "Content-Type": "application/json",
     },
   });
 
-  const mock = new MockAdapter(client);
+  const mock = new FetchMockAdapter(client);
 
   mock.onGet("/test").reply(200);
 

@@ -1,12 +1,12 @@
-import type { AxiosInstance } from "axios";
+import type { HttpClient } from "./httpClient";
 import { v4 as uuid } from "uuid";
 
 import type { ApiUserInfo, Credentials } from "./common";
 
 export default class Users {
-  private client: AxiosInstance;
+  private client: HttpClient;
 
-  constructor(client: AxiosInstance) {
+  constructor(client: HttpClient) {
     this.client = client;
   }
 

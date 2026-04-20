@@ -1,4 +1,4 @@
-import type { AxiosInstance } from "axios";
+import type { HttpClient } from "./httpClient";
 import { v4 as uuid } from "uuid";
 
 import { getTransactionError } from "./errors";
@@ -115,10 +115,10 @@ export interface Payment {
 }
 
 export default class Collections {
-  private client: AxiosInstance;
+  private client: HttpClient;
   private config: Config;
 
-  constructor(client: AxiosInstance, config: Config) {
+  constructor(client: HttpClient, config: Config) {
     this.client = client;
     this.config = config;
   }

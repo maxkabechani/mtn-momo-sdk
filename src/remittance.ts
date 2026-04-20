@@ -1,4 +1,4 @@
-import type { AxiosInstance } from "axios";
+import type { HttpClient } from "./httpClient";
 
 import type {
   Balance,
@@ -24,10 +24,10 @@ import { v4 as uuid } from "uuid";
  * Remittance product for cross-border money transfers with optional OAuth2 consent flows
  */
 export default class Remittance {
-  private readonly client: AxiosInstance;
+  private readonly client: HttpClient;
   private readonly config: Config;
 
-  constructor(client: AxiosInstance, config: Config) {
+  constructor(client: HttpClient, config: Config) {
     this.client = client;
     this.config = config;
   }

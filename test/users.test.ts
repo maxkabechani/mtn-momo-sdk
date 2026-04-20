@@ -1,5 +1,5 @@
-import type { AxiosInstance } from "axios";
-import MockAdapter from "axios-mock-adapter";
+import type { HttpClient } from "../src/httpClient";
+import type { FetchFetchMockAdapter } from "./mock";
 import { expect } from "vitest";
 
 import Users from "../src/users";
@@ -7,8 +7,8 @@ import { createMock } from "./mock";
 
 describe("Users", function () {
   let users: Users;
-  let mockAdapter: MockAdapter;
-  let mockClient: AxiosInstance;
+  let mockAdapter: FetchMockAdapter;
+  let mockClient: HttpClient;
 
   beforeEach(() => {
     [mockClient, mockAdapter] = createMock();

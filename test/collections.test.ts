@@ -1,5 +1,5 @@
-import type { AxiosInstance } from "axios";
-import MockAdapter from "axios-mock-adapter";
+import type { HttpClient } from "../src/httpClient";
+import type { FetchFetchMockAdapter } from "./mock";
 import { expect } from "vitest";
 
 import Collections from "../src/collections";
@@ -11,8 +11,8 @@ import { PartyIdType, type WithdrawalRequest } from "../src/common";
 
 describe("Collections", function () {
   let collections: Collections;
-  let mockAdapter: MockAdapter;
-  let mockClient: AxiosInstance;
+  let mockAdapter: FetchMockAdapter;
+  let mockClient: HttpClient;
 
   beforeEach(() => {
     [mockClient, mockAdapter] = createMock();

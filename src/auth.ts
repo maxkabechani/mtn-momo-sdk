@@ -1,4 +1,4 @@
-import type { AxiosInstance } from "axios";
+import type { HttpClient } from "./httpClient";
 
 import { createClient } from "./client";
 
@@ -14,7 +14,7 @@ export interface AuthorizerOptions {
 export type Authorizer = (
   config: Config,
   options?: AuthorizerOptions,
-  client?: AxiosInstance,
+  client?: HttpClient,
 ) => Promise<AccessToken & { refresh_token?: string; refresh_token_expired_in?: number }>;
 
 interface OAuthCredentials {
@@ -74,7 +74,7 @@ function isRefreshExpired(credentials: OAuthCredentials): boolean {
 export const authorizeCollections: Authorizer = function (
   config: Config,
   options?: AuthorizerOptions,
-  client: AxiosInstance = createClient(config),
+  client: HttpClient = createClient(config),
 ): Promise<any> {
   const basicAuthToken: string = createBasicAuthToken(config);
   return client
@@ -89,7 +89,7 @@ export const authorizeCollections: Authorizer = function (
 export const authorizeDisbursements: Authorizer = function (
   config: Config,
   options?: AuthorizerOptions,
-  client: AxiosInstance = createClient(config),
+  client: HttpClient = createClient(config),
 ): Promise<any> {
   const basicAuthToken: string = createBasicAuthToken(config);
   return client
@@ -104,7 +104,7 @@ export const authorizeDisbursements: Authorizer = function (
 export const authorizeRemittance: Authorizer = function (
   config: Config,
   options?: AuthorizerOptions,
-  client: AxiosInstance = createClient(config),
+  client: HttpClient = createClient(config),
 ): Promise<any> {
   const basicAuthToken: string = createBasicAuthToken(config);
   return client

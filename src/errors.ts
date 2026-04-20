@@ -1,4 +1,4 @@
-import type { AxiosError } from "axios";
+import type { HttpClientError } from "./httpClient";
 import type { Payment } from "./collections";
 import type { Deposit, Refund, Withdrawal } from "./common";
 import { FailureReason } from "./common";
@@ -90,8 +90,8 @@ export class UnspecifiedError extends MtnMoMoError {
   public override name = "UnspecifiedError";
 }
 
-export function handleError(error: AxiosError): Error {
-  if (!error.response) {
+export function handleError(error: HttpClientError | Error): Error {
+  if (!("response" in error) || !error.response) {
     return error;
   }
 
