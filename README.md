@@ -772,6 +772,9 @@ bun run build        # Build for production (ESM + CJS)
 bun run test:package # Packed Node ESM/CJS, Bun, and declarations
 ```
 
+Releases are published from version tags through npm Trusted Publishing. See
+[`RELEASING.md`](./RELEASING.md) for the release procedure.
+
 ## License
 
 ISC
