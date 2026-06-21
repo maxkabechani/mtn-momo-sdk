@@ -1,6 +1,6 @@
 {
   "name": "@maxkabechani/mtn-momo-sdk",
-  "version": "0.2.2",
+  "version": "1.0.0",
   "description": "MTN Mobile Money API Client for NodeJS written in TypeScript",
   "repository": {
     "type": "git",
@@ -29,13 +29,18 @@
   "scripts": {
     "clean": "rm -rf lib",
     "typecheck": "bunx tsc -p tsconfig.typecheck.json",
+    "lint": "bun run typecheck",
     "build:esm": "tsc -p tsconfig.esm.json",
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build": "bun run clean && bun run build:esm && bun run build:cjs && mkdir -p lib/esm lib/cjs && echo '{\"type\":\"module\"}' > lib/esm/package.json && echo '{\"type\":\"commonjs\"}' > lib/cjs/package.json",
     "test": "NODE_ENV=test vitest run",
-    "test:integration": "vitest run test/integration.test.ts",
+    "test:security": "NODE_ENV=test vitest run test/security.test.ts",
+    "test:integration": "bun run test:integration:local",
+    "test:integration:local": "NODE_ENV=test vitest run test/security.test.ts",
+    "test:integration:live": "NODE_ENV=test vitest run test/integration.test.ts",
     "test:watch": "NODE_ENV=test vitest",
     "test:coverage": "NODE_ENV=test vitest run --coverage",
+    "test:package": "node test/package-smoke.mjs",
     "example:collections": "bun examples/collections.ts",
     "example:collections:extended": "bun examples/collections-extended.ts",
     "example:disbursements": "bun examples/disbursements.ts",
@@ -57,9 +62,13 @@
     "momo-sandbox": "lib/cjs/cli.js"
   },
   "license": "ISC",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "packageManager": "bun@1.3.14",
   "dependencies": {
     "commander": "^14.0.3",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.1"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
@@ -68,7 +77,12 @@
     "typescript": "^6.0.2",
     "vitest": "^4.1.1"
   },
+  "overrides": {
+    "postcss": "8.5.15",
+    "vite": "8.0.16"
+  },
   "files": [
-    "lib"
+    "lib",
+    "MIGRATION.md"
   ]
 }

@@ -100,7 +100,7 @@ async function run() {
     { name: "isPayerActive", fn: () => remittanceClient.isPayerActive(PARTY_ID) },
     { name: "getBasicUserInfo", fn: () => remittanceClient.getBasicUserInfo(PARTY_ID) },
     { name: "transfer", fn: () => remittanceClient.transfer({ amount: "10", currency: "EUR", externalId: "remit-999", payee: { partyIdType: PartyIdType.MSISDN, partyId: PARTY_ID }, payerMessage: "msg", payeeNote: "note" }) },
-    { name: "getUserInfoWithConsent", fn: () => remittanceClient.getUserInfoWithConsent() },
+    { name: "getUserInfoWithConsent", fn: () => remittanceClient.getUserInfoWithConsent("test-consent-token") },
   ];
 
   for (const endpoint of remittanceEndpoints) {

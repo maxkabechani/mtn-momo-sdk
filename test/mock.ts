@@ -5,14 +5,33 @@ import type { AccessToken, Balance, Credentials } from "../src/common";
 import type { Transfer } from "../src/disbursements";
 import { HttpClient } from "../src/httpClient";
 
+export const VALID_REFERENCE_ID = "11111111-1111-4111-8111-111111111111";
+export const SECOND_REFERENCE_ID = "22222222-2222-4222-8222-222222222222";
+export const FAILED_REFERENCE_ID = "ffffffff-ffff-4fff-bfff-ffffffffffff";
+
 type Replier = {
   reply: (status: number, data?: any, headers?: any) => void;
 };
 
+export interface MockRequest {
+  url: string;
+  data?: string | URLSearchParams | null;
+  headers?: Record<string, string>;
+  method: string;
+}
+
+interface MockHistory {
+  get: MockRequest[];
+  post: MockRequest[];
+  put: MockRequest[];
+  delete: MockRequest[];
+  patch: MockRequest[];
+}
+
 export class FetchMockAdapter {
   private client: HttpClient;
   private handlers: { method: string, matcher: string | RegExp, response?: any, status?: number, headers?: any }[] = [];
-  public history: Record<string, any[]> = {
+  public history: MockHistory = {
     get: [],
     post: [],
     put: [],
@@ -26,6 +45,12 @@ export class FetchMockAdapter {
     global.fetch = vi.fn().mockImplementation(async (url: string | URL | globalThis.Request, init?: RequestInit) => {
        const method = (init?.method || 'GET').toUpperCase();
        const urlStr = url.toString();
+       const capturedHeaders =
+         init?.headers instanceof Headers
+           ? Object.fromEntries(init.headers.entries())
+           : Array.isArray(init?.headers)
+             ? Object.fromEntries(init.headers)
+             : ({ ...(init?.headers || {}) } as Record<string, string>);
        
        let requestData = init?.body;
        if (requestData instanceof URLSearchParams) {
@@ -34,10 +59,11 @@ export class FetchMockAdapter {
          requestData = JSON.stringify(requestData);
        }
        
-       this.history[method.toLowerCase()].push({
+       const historyKey = method.toLowerCase() as keyof MockHistory;
+       this.history[historyKey].push({
           url: urlStr.replace(this.client.defaults.baseURL || "", ""),
           data: requestData,
-          headers: init?.headers,
+          headers: capturedHeaders,
           method: method
        });
        
@@ -57,24 +83,20 @@ export class FetchMockAdapter {
        });
 
        if (!handler) {
-         return {
-           ok: false,
-           status: 404,
-           statusText: "Not Found",
-           headers: new Headers(),
-           text: async () => "",
-           json: async () => null
-         };
+         return new Response(null, { status: 404, statusText: "Not Found" });
        }
-       
-       return {
-         ok: handler.status ? handler.status >= 200 && handler.status < 300 : true,
+
+       const responseBody =
+         handler.response === undefined
+           ? null
+           : typeof handler.response === "string"
+             ? handler.response
+             : JSON.stringify(handler.response);
+       return new Response(responseBody, {
          status: handler.status || 200,
          statusText: "OK",
-         headers: new Headers(handler.headers || { "content-type": "application/json" }),
-         text: async () => typeof handler.response === 'string' ? handler.response : JSON.stringify(handler.response),
-         json: async () => handler.response
-       };
+         headers: handler.headers || { "content-type": "application/json" },
+       });
     });
   }
 
@@ -142,7 +164,7 @@ export function createMock(): [HttpClient, FetchMockAdapter] {
 
   mock.onPost("/collection/v1_0/requesttopay").reply(201);
 
-  mock.onGet(/\/collection\/v1_0\/requesttopay\/failed/).reply(200, {
+  mock.onGet(`/collection/v1_0/requesttopay/${FAILED_REFERENCE_ID}`).reply(200, {
     financialTransactionId: "tx id",
     externalId: "string",
     amount: "2000",
@@ -184,7 +206,7 @@ export function createMock(): [HttpClient, FetchMockAdapter] {
   mock.onPost("/collection/v1_0/requesttowithdraw").reply(201);
   mock.onPost("/collection/v2_0/requesttowithdraw").reply(201);
 
-  mock.onGet(/\/collection\/v1_0\/requesttowithdraw\/failed/).reply(200, {
+  mock.onGet(`/collection/v1_0/requesttowithdraw/${FAILED_REFERENCE_ID}`).reply(200, {
     financialTransactionId: "tx id",
     externalId: "string",
     amount: "2000",
@@ -263,7 +285,7 @@ export function createMock(): [HttpClient, FetchMockAdapter] {
   mock.onPost("/disbursement/v1_0/refund").reply(202);
   mock.onPost("/disbursement/v2_0/refund").reply(202);
 
-  mock.onGet(/\/disbursement\/v1_0\/transfer\/failed/).reply(200, {
+  mock.onGet(`/disbursement/v1_0/transfer/${FAILED_REFERENCE_ID}`).reply(200, {
     financialTransactionId: "tx id",
     externalId: "string",
     amount: "2000",
@@ -288,7 +310,7 @@ export function createMock(): [HttpClient, FetchMockAdapter] {
     status: "SUCCESSFUL",
   } as Transfer);
 
-  mock.onGet(/\/disbursement\/v1_0\/deposit\/failed/).reply(200, {
+  mock.onGet(`/disbursement/v1_0/deposit/${FAILED_REFERENCE_ID}`).reply(200, {
     financialTransactionId: "tx id",
     externalId: "string",
     amount: "2000",
@@ -313,7 +335,7 @@ export function createMock(): [HttpClient, FetchMockAdapter] {
     status: "SUCCESSFUL",
   });
 
-  mock.onGet(/\/disbursement\/v1_0\/refund\/failed/).reply(200, {
+  mock.onGet(`/disbursement/v1_0/refund/${FAILED_REFERENCE_ID}`).reply(200, {
     financialTransactionId: "tx id",
     externalId: "string",
     amount: "2000",
@@ -388,7 +410,7 @@ export function createMock(): [HttpClient, FetchMockAdapter] {
     .onPost("/remittance/v1_0/transfer")
     .reply(202, {}, { "x-reference-id": "reference-id" });
 
-  mock.onGet(/\/remittance\/v1_0\/transfer\/failed/).reply(200, {
+  mock.onGet(`/remittance/v1_0/transfer/${FAILED_REFERENCE_ID}`).reply(200, {
     financialTransactionId: "tx id",
     externalId: "string",
     amount: "2000",
@@ -443,7 +465,7 @@ export function createMock(): [HttpClient, FetchMockAdapter] {
 
   mock.onPost("/remittance/v2_0/cashtransfer").reply(202);
 
-  mock.onGet(/\/remittance\/v2_0\/cashtransfer\/failed/).reply(200, {
+  mock.onGet(`/remittance/v2_0/cashtransfer/${FAILED_REFERENCE_ID}`).reply(200, {
     financialTransactionId: "tx id",
     externalId: "string",
     amount: "2000",

@@ -1,4 +1,4 @@
-import type { HttpClient } from "./httpClient";
+import type { HttpClient } from "./httpClient.js";
 
 import type {
   Balance,
@@ -10,15 +10,20 @@ import type {
   ConsentKycResponse,
   OAuth2TokenRequest,
   OAuth2TokenResponse,
-  Party,
-  ProductConfig,
-} from "./common";
-import { TransactionStatus, PartyIdType } from "./common";
-import { getTransactionError, MtnMoMoError } from "./errors";
-import { createBasicAuthToken } from "./auth";
-import type { Config } from "./common";
-
-import { v4 as uuid } from "uuid";
+} from "./common.js";
+import { PartyIdType, TransactionStatus } from "./common.js";
+import { createBasicAuthToken } from "./auth.js";
+import { getTransactionError } from "./errors.js";
+import type { Config } from "./common.js";
+import {
+  pathCurrency,
+  pathPartyId,
+  pathPartyType,
+  pathUuid,
+  resolveReferenceId,
+  validateAccessToken,
+} from "./security.js";
+import { validateCashTransferRequest } from "./validate.js";
 
 /**
  * Remittance product for cross-border money transfers with optional OAuth2 consent flows
@@ -38,7 +43,8 @@ export default class Remittance {
    * @returns A promise that resolves to the financial transaction ID (referenceId)
    */
   async transfer(request: CashTransferRequest): Promise<string> {
-    const referenceId = uuid();
+    await validateCashTransferRequest(request);
+    const referenceId = resolveReferenceId(request.referenceId);
     await this.client.post(
       `/remittance/v1_0/transfer`,
       {
@@ -73,7 +79,7 @@ export default class Remittance {
    */
   async getTransaction(referenceId: string): Promise<CashTransfer> {
     const response = await this.client.get<CashTransfer>(
-      `/remittance/v1_0/transfer/${referenceId}`,
+      `/remittance/v1_0/transfer/${pathUuid(referenceId)}`,
     );
 
     const transaction = response.data;
@@ -104,13 +110,20 @@ export default class Remittance {
     partyId: string,
     partyIdType: PartyIdType = PartyIdType.MSISDN,
   ): Promise<boolean> {
+    const safeType = pathPartyType(partyIdType);
+    const safeId = pathPartyId(safeType, partyId);
     try {
-      const response = await this.client.get(
-        `/remittance/v1_0/accountholder/${partyIdType}/${partyId}/active`,
+      const response = await this.client.get<{ result?: unknown }>(
+        `/remittance/v1_0/accountholder/${safeType}/${safeId}/active`,
       );
-      return response.status === 200;
-    } catch (error: any) {
-      if (error.response?.status === 404) {
+      return response.data?.result === true;
+    } catch (error: unknown) {
+      if (
+        error &&
+        typeof error === "object" &&
+        "status" in error &&
+        error.status === 404
+      ) {
         return false;
       }
       throw error;
@@ -125,9 +138,10 @@ export default class Remittance {
    * @returns A promise that resolves to the basic user information
    */
   public getBasicUserInfo(partyId: string): Promise<BasicUserInfo> {
+    const safeId = pathPartyId(PartyIdType.MSISDN, partyId);
     return this.client
       .get<BasicUserInfo>(
-        `/remittance/v1_0/accountholder/MSISDN/${partyId}/basicuserinfo`,
+        `/remittance/v1_0/accountholder/MSISDN/${safeId}/basicuserinfo`,
       )
       .then((response) => response.data);
   }
@@ -140,7 +154,9 @@ export default class Remittance {
    */
   public getBalanceInCurrency(currency: string): Promise<Balance> {
     return this.client
-      .get<Balance>(`/remittance/v1_0/account/balance/${currency}`)
+      .get<Balance>(
+        `/remittance/v1_0/account/balance/${pathCurrency(currency)}`,
+      )
       .then((response) => response.data);
   }
 
@@ -149,9 +165,16 @@ export default class Remittance {
    * Requires prior OAuth2 user consent/login flow to obtain authorization
    * @returns A promise that resolves to the user's information and KYC consent details
    */
-  public getUserInfoWithConsent(): Promise<ConsentKycResponse> {
+  public getUserInfoWithConsent(
+    consentToken: string,
+  ): Promise<ConsentKycResponse> {
+    validateAccessToken(consentToken);
     return this.client
-      .get<ConsentKycResponse>(`/remittance/oauth2/v1_0/userinfo`)
+      .get<ConsentKycResponse>("/remittance/oauth2/v1_0/userinfo", {
+        headers: {
+          Authorization: `Bearer ${consentToken}`,
+        },
+      })
       .then((response) => response.data);
   }
 
@@ -199,10 +222,10 @@ export default class Remittance {
    * @returns A promise that resolves to the reference ID
    */
   public cashTransfer(request: CashTransferRequest): Promise<string> {
-    const referenceId = uuid();
-
-    return this.client
-      .post<void>(
+    return validateCashTransferRequest(request).then(() => {
+      const referenceId = resolveReferenceId(request.referenceId);
+      return this.client
+        .post<void>(
         "/remittance/v2_0/cashtransfer",
         {
           amount: request.amount,
@@ -223,8 +246,9 @@ export default class Remittance {
               : {}),
           },
         },
-      )
-      .then(() => referenceId);
+        )
+        .then(() => referenceId);
+    });
   }
 
   /**
@@ -235,7 +259,9 @@ export default class Remittance {
    */
   public getCashTransfer(referenceId: string): Promise<CashTransfer> {
     return this.client
-      .get<CashTransfer>(`/remittance/v2_0/cashtransfer/${referenceId}`)
+      .get<CashTransfer>(
+        `/remittance/v2_0/cashtransfer/${pathUuid(referenceId)}`,
+      )
       .then((response) => response.data)
       .then((transfer) => {
         if (transfer.status === TransactionStatus.FAILED) {
@@ -258,9 +284,11 @@ export default class Remittance {
     params.append("grant_type", request.grant_type);
     params.append("auth_req_id", request.auth_req_id);
 
+    const basicAuthToken = createBasicAuthToken(this.config);
     return this.client
       .post<OAuth2TokenResponse>("/remittance/oauth2/token/", params, {
         headers: {
+          Authorization: `Basic ${basicAuthToken}`,
           "Content-Type": "application/x-www-form-urlencoded",
         },
       })

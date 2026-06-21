@@ -1,18 +1,33 @@
-import { HttpClient, createHttpClient } from "./httpClient";
-import type { InternalRequestConfig } from "./httpClient";
+import { HttpClient, createHttpClient } from "./httpClient.js";
+import type { InternalRequestConfig } from "./httpClient.js";
 
-import { handleError } from "./errors";
+import { handleError } from "./errors.js";
 
-import type { TokenRefresher } from "./auth";
-import type { GlobalConfig, SubscriptionConfig } from "./common";
+import type { TokenRefresher } from "./auth.js";
+import {
+  Environment,
+  type GlobalConfig,
+  type SubscriptionConfig,
+} from "./common.js";
+import {
+  DEFAULT_MAX_RESPONSE_BYTES,
+  DEFAULT_TIMEOUT_MS,
+  normalizeBaseUrl,
+} from "./security.js";
 
 export function createClient(
   config: SubscriptionConfig & GlobalConfig,
   client: HttpClient = createHttpClient(),
 ): HttpClient {
   if (config.baseUrl) {
-    client.defaults.baseURL = config.baseUrl;
+    client.defaults.baseURL = normalizeBaseUrl(
+      config.baseUrl,
+      config.environment ?? Environment.SANDBOX,
+    );
   }
+  client.defaults.timeout = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  client.defaults.maxResponseBytes =
+    config.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES;
   client.defaults.headers.common["Ocp-Apim-Subscription-Key"] =
     config.primaryKey;
   client.defaults.headers.common["X-Target-Environment"] =
@@ -27,9 +42,14 @@ export function createAuthClient(
 ): HttpClient {
   client.interceptors.request.use(
     async (request: InternalRequestConfig) => {
-      const accessToken = await refresh();
       request.headers = request.headers || {};
-      request.headers["Authorization"] = `Bearer ${accessToken}`;
+      const hasExplicitAuthorization = Object.keys(request.headers).some(
+        (name) => name.toLowerCase() === "authorization",
+      );
+      if (!hasExplicitAuthorization) {
+        const accessToken = await refresh();
+        request.headers["Authorization"] = `Bearer ${accessToken}`;
+      }
 
       return request;
     },
@@ -41,7 +61,12 @@ export function createAuthClient(
 export function withErrorHandling(client: HttpClient): HttpClient {
   client.interceptors.response.use(
     (response) => response,
-    (error) => Promise.reject(handleError(error)),
+    (error) =>
+      Promise.reject(
+        handleError(
+          error instanceof Error ? error : new Error(String(error)),
+        ),
+      ),
   );
 
   return client;

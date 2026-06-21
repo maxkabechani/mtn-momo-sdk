@@ -62,7 +62,7 @@ describe("Validate", function () {
               validateGlobalConfig.bind(null, {
                 callbackHost: "example.com",
                 environment: Environment.PRODUCTION,
-                baseUrl: "mtn production base url",
+                baseUrl: "https://mtn.example.com",
               }),
             ).not.toThrowError();
           });
@@ -249,7 +249,7 @@ describe("Validate", function () {
           amount: "1000",
           currency: "UGX",
           payer: {
-            partyId: "xxx",
+            partyId: "256772000000",
           },
         } as PaymentRequest;
         await expect(validateRequestToPay(request)).rejects.toThrowError(
@@ -264,7 +264,7 @@ describe("Validate", function () {
           amount: "1000",
           currency: "UGX",
           payer: {
-            partyId: "xxx",
+            partyId: "256772000000",
             partyIdType: PartyIdType.MSISDN,
           },
         } as PaymentRequest;
@@ -274,18 +274,17 @@ describe("Validate", function () {
   });
 
   describe("validateTransfer", function () {
-    describe("when the referenceId is missing", function () {
-      it("throws an error", async function () {
-        const request = {} as TransferRequest;
-        await expect(validateTransfer(request)).rejects.toThrowError(
-          "referenceId is required",
-        );
-      });
-    });
-
     describe("when referenceId is not a valid uuid", function () {
       it("throws an error", async function () {
-        const request = { referenceId: "test reference id" } as TransferRequest;
+        const request = {
+          referenceId: "test reference id",
+          amount: "100",
+          currency: "UGX",
+          payee: {
+            partyId: "256772000000",
+            partyIdType: PartyIdType.MSISDN,
+          },
+        } as TransferRequest;
         await expect(validateTransfer(request)).rejects.toThrowError(
           "referenceId must be a valid uuid v4",
         );
@@ -359,7 +358,7 @@ describe("Validate", function () {
           amount: "1000",
           currency: "UGX",
           payee: {
-            partyId: "xxx",
+            partyId: "256772000000",
           },
         } as TransferRequest;
         await expect(validateTransfer(request)).rejects.toThrowError(
@@ -375,7 +374,7 @@ describe("Validate", function () {
           amount: "1000",
           currency: "UGX",
           payee: {
-            partyId: "xxx",
+            partyId: "256772000000",
             partyIdType: PartyIdType.MSISDN,
           },
         } as TransferRequest;

@@ -1,12 +1,16 @@
 import type { HttpClient } from "../src/httpClient";
-import type { FetchFetchMockAdapter } from "./mock";
+import type { FetchMockAdapter } from "./mock";
 import { expect } from "vitest";
 
 import type { CashTransferRequest } from "../src/common";
 import { PartyIdType } from "../src/common";
 import Remittance from "../src/remittance";
 
-import { createMock } from "./mock";
+import {
+  createMock,
+  FAILED_REFERENCE_ID,
+  VALID_REFERENCE_ID,
+} from "./mock";
 
 describe("Remittance", function () {
   let remittance: Remittance;
@@ -58,17 +62,17 @@ describe("Remittance", function () {
   describe("getTransaction", function () {
     it("makes the correct request", async function () {
       await expect(
-        remittance.getTransaction("reference"),
+        remittance.getTransaction(VALID_REFERENCE_ID),
       ).resolves.toBeDefined();
       expect(mockAdapter.history.get).toHaveLength(1);
       expect(mockAdapter.history.get[0]!.url).toBe(
-        "/remittance/v1_0/transfer/reference",
+        `/remittance/v1_0/transfer/${VALID_REFERENCE_ID}`,
       );
     });
 
     it("rejects with error when transaction has FAILED status", async function () {
       await expect(
-        remittance.getTransaction("failed"),
+        remittance.getTransaction(FAILED_REFERENCE_ID),
       ).rejects.toThrow();
     });
   });
@@ -119,7 +123,9 @@ describe("Remittance", function () {
 
   describe("getUserInfoWithConsent", function () {
     it("makes the correct request", async function () {
-      await expect(remittance.getUserInfoWithConsent()).resolves.toBeDefined();
+      await expect(
+        remittance.getUserInfoWithConsent("consent-token"),
+      ).resolves.toBeDefined();
       expect(mockAdapter.history.get).toHaveLength(1);
       expect(mockAdapter.history.get[0]!.url).toBe("/remittance/oauth2/v1_0/userinfo");
     });
@@ -173,17 +179,17 @@ describe("Remittance", function () {
   describe("getCashTransfer", function () {
     it("makes the correct request", async function () {
       await expect(
-        remittance.getCashTransfer("reference"),
+        remittance.getCashTransfer(VALID_REFERENCE_ID),
       ).resolves.toBeDefined();
       expect(mockAdapter.history.get).toHaveLength(1);
       expect(mockAdapter.history.get[0]!.url).toBe(
-        "/remittance/v2_0/cashtransfer/reference",
+        `/remittance/v2_0/cashtransfer/${VALID_REFERENCE_ID}`,
       );
     });
 
     it("rejects with error when cash transfer has FAILED status", async function () {
       await expect(
-        remittance.getCashTransfer("failed"),
+        remittance.getCashTransfer(FAILED_REFERENCE_ID),
       ).rejects.toThrow();
     });
   });

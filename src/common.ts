@@ -1,3 +1,5 @@
+import type { FinancialOperationOptions } from "./security.js";
+
 export type Config = GlobalConfig & ProductConfig;
 
 export type ProductConfig = SubscriptionConfig & UserConfig;
@@ -21,6 +23,16 @@ export interface GlobalConfig {
    * initiate the transaction.
    */
   environment?: Environment;
+
+  /**
+   * Request timeout in milliseconds. Defaults to 30 seconds.
+   */
+  timeoutMs?: number;
+
+  /**
+   * Maximum response body size in bytes. Defaults to 1 MiB.
+   */
+  maxResponseBytes?: number;
 }
 
 export interface SubscriptionConfig {
@@ -200,7 +212,7 @@ export interface ConsentKycResponse {
 /**
  * Request to withdraw (Collections)
  */
-export interface WithdrawalRequest {
+export interface WithdrawalRequest extends FinancialOperationOptions {
   amount: string;
   currency: string;
   externalId?: string;
@@ -256,7 +268,7 @@ export interface OAuth2TokenRequest {
 /**
  * Deposit request (Disbursements v1_0)
  */
-export interface DepositRequest {
+export interface DepositRequest extends FinancialOperationOptions {
   amount: string;
   currency: string;
   externalId?: string;
@@ -284,7 +296,7 @@ export interface Deposit {
 /**
  * Refund request (Disbursements v1_0)
  */
-export interface RefundRequest {
+export interface RefundRequest extends FinancialOperationOptions {
   amount: string;
   currency: string;
   externalId?: string;
@@ -311,7 +323,7 @@ export interface Refund {
 /**
  * Cash transfer request (Remittance)
  */
-export interface CashTransferRequest {
+export interface CashTransferRequest extends FinancialOperationOptions {
   amount: string;
   currency: string;
   externalId?: string;

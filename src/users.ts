@@ -1,13 +1,22 @@
-import type { HttpClient } from "./httpClient";
-import { v4 as uuid } from "uuid";
+import type { HttpClient } from "./httpClient.js";
 
-import type { ApiUserInfo, Credentials } from "./common";
+import { Environment, type ApiUserInfo, type Credentials } from "./common.js";
+import {
+  encodeStrictPathSegment,
+  generateReferenceId,
+  pathUuid,
+} from "./security.js";
 
 export default class Users {
   private client: HttpClient;
+  private environment: Environment;
 
-  constructor(client: HttpClient) {
+  constructor(
+    client: HttpClient,
+    environment: Environment = Environment.SANDBOX,
+  ) {
     this.client = client;
+    this.environment = environment;
   }
 
   /**
@@ -15,11 +24,13 @@ export default class Users {
    * @param host The provider callback host
    */
   public create(host: string): Promise<string> {
-    const userId: string = uuid();
+    this.assertSandbox();
+    const safeHost = encodeStrictPathSegment(host, "host");
+    const userId = generateReferenceId();
     return this.client
       .post(
         "/v1_0/apiuser",
-        { providerCallbackHost: host },
+        { providerCallbackHost: decodeURIComponent(safeHost) },
         {
           headers: {
             "X-Reference-Id": userId,
@@ -34,8 +45,9 @@ export default class Users {
    * @param userId
    */
   public login(userId: string): Promise<Credentials> {
+    this.assertSandbox();
     return this.client
-      .post<Credentials>(`/v1_0/apiuser/${userId}/apikey`)
+      .post<Credentials>(`/v1_0/apiuser/${pathUuid(userId, "userId")}/apikey`)
       .then((response) => response.data);
   }
 
@@ -44,8 +56,15 @@ export default class Users {
    * @param referenceId API user reference id (X-Reference-Id used at creation)
    */
   public getApiUser(referenceId: string): Promise<ApiUserInfo> {
+    this.assertSandbox();
     return this.client
-      .get<ApiUserInfo>(`/v1_0/apiuser/${referenceId}`)
+      .get<ApiUserInfo>(`/v1_0/apiuser/${pathUuid(referenceId)}`)
       .then((response) => response.data);
+  }
+
+  private assertSandbox(): void {
+    if (this.environment !== Environment.SANDBOX) {
+      throw new Error("API user provisioning is only available in sandbox");
+    }
   }
 }

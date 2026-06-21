@@ -1,9 +1,9 @@
 import type { HttpClient } from "../src/httpClient";
-import type { FetchFetchMockAdapter } from "./mock";
+import type { FetchMockAdapter } from "./mock";
 import { expect } from "vitest";
 
 import Users from "../src/users";
-import { createMock } from "./mock";
+import { createMock, VALID_REFERENCE_ID } from "./mock";
 
 describe("Users", function () {
   let users: Users;
@@ -31,17 +31,21 @@ describe("Users", function () {
 
   describe("login", function () {
     it("makes the correct request", async function () {
-      await expect(users.login("id")).resolves.toBeDefined();
+      await expect(users.login(VALID_REFERENCE_ID)).resolves.toBeDefined();
       expect(mockAdapter.history.post).toHaveLength(1);
-      expect(mockAdapter.history.post[0]!.url).toBe("/v1_0/apiuser/id/apikey");
+      expect(mockAdapter.history.post[0]!.url).toBe(
+        `/v1_0/apiuser/${VALID_REFERENCE_ID}/apikey`,
+      );
     });
   });
 
   describe("getApiUser", function () {
     it("makes the correct request", async function () {
-      await expect(users.getApiUser("id")).resolves.toBeDefined();
+      await expect(users.getApiUser(VALID_REFERENCE_ID)).resolves.toBeDefined();
       expect(mockAdapter.history.get).toHaveLength(1);
-      expect(mockAdapter.history.get[0]!.url).toBe("/v1_0/apiuser/id");
+      expect(mockAdapter.history.get[0]!.url).toBe(
+        `/v1_0/apiuser/${VALID_REFERENCE_ID}`,
+      );
     });
   });
 });

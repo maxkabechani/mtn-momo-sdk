@@ -1,10 +1,13 @@
-import type { HttpClient } from "./httpClient";
-import { v4 as uuid } from "uuid";
+import type { HttpClient } from "./httpClient.js";
 
-import { getTransactionError } from "./errors";
-import { validateTransfer, validateDepositRequest, validateRefundRequest } from "./validate";
-import { createBasicAuthToken } from "./auth";
-import type { Config } from "./common";
+import { createBasicAuthToken } from "./auth.js";
+import { getTransactionError } from "./errors.js";
+import {
+  validateDepositRequest,
+  validateRefundRequest,
+  validateTransfer,
+} from "./validate.js";
+import type { Config } from "./common.js";
 
 import {
   type Balance,
@@ -21,13 +24,18 @@ import {
   type Refund,
   type RefundRequest,
   TransactionStatus,
-} from "./common";
+} from "./common.js";
+import {
+  pathCurrency,
+  pathPartyId,
+  pathPartyType,
+  pathUuid,
+  resolveReferenceId,
+  validateAccessToken,
+  type FinancialOperationOptions,
+} from "./security.js";
 
-export interface TransferRequest {
-  /**
-   * Unique Transfer Reference (UUID v4), will be automatically generated if not explicitly supplied
-   */
-  referenceId?: string;
+export interface TransferRequest extends FinancialOperationOptions {
   /**
    * Amount that will be debited from the payer account.
    */
@@ -132,10 +140,14 @@ export default class Disbursements {
    */
   public transfer({
     callbackUrl,
-    referenceId = uuid(),
+    referenceId: suppliedReferenceId,
     ...payoutRequest
   }: TransferRequest): Promise<string> {
-    return validateTransfer({ referenceId, ...payoutRequest }).then(() => {
+    return validateTransfer({
+      referenceId: suppliedReferenceId,
+      ...payoutRequest,
+    }).then(() => {
+      const referenceId = resolveReferenceId(suppliedReferenceId);
       return this.client
         .post<void>("/disbursement/v1_0/transfer", payoutRequest, {
           headers: {
@@ -159,7 +171,9 @@ export default class Disbursements {
    */
   public getTransaction(referenceId: string): Promise<Transfer> {
     return this.client
-      .get<Transfer>(`/disbursement/v1_0/transfer/${referenceId}`)
+      .get<Transfer>(
+        `/disbursement/v1_0/transfer/${pathUuid(referenceId)}`,
+      )
       .then((response) => response.data)
       .then((transaction) => {
         if (transaction.status === TransactionStatus.FAILED) {
@@ -194,9 +208,11 @@ export default class Disbursements {
     id: string,
     type: PartyIdType = PartyIdType.MSISDN,
   ): Promise<boolean> {
+    const safeType = pathPartyType(type);
+    const safeId = pathPartyId(safeType, id);
     return this.client
       .get<{ result: boolean }>(
-        `/disbursement/v1_0/accountholder/${type}/${id}/active`,
+        `/disbursement/v1_0/accountholder/${safeType}/${safeId}/active`,
       )
       .then((response) => response.data)
       .then((data) => (data.result !== undefined ? data.result : false));
@@ -209,8 +225,8 @@ export default class Disbursements {
    * @returns A promise that resolves to the deposit reference ID
    */
   public deposit(depositRequest: DepositRequest): Promise<string> {
-    const referenceId: string = uuid();
     return validateDepositRequest(depositRequest).then(() => {
+      const referenceId = resolveReferenceId(depositRequest.referenceId);
       return this.client
         .post<void>(
           "/disbursement/v1_0/deposit",
@@ -242,8 +258,8 @@ export default class Disbursements {
    * @returns A promise that resolves to the deposit reference ID
    */
   public depositV2(depositRequest: DepositRequest): Promise<string> {
-    const referenceId: string = uuid();
     return validateDepositRequest(depositRequest).then(() => {
+      const referenceId = resolveReferenceId(depositRequest.referenceId);
       return this.client
         .post<void>(
           "/disbursement/v2_0/deposit",
@@ -276,7 +292,9 @@ export default class Disbursements {
    */
   public getDeposit(referenceId: string): Promise<Deposit> {
     return this.client
-      .get<Deposit>(`/disbursement/v1_0/deposit/${referenceId}`)
+      .get<Deposit>(
+        `/disbursement/v1_0/deposit/${pathUuid(referenceId)}`,
+      )
       .then((response) => response.data)
       .then((deposit) => {
         if (deposit.status === TransactionStatus.FAILED) {
@@ -293,8 +311,8 @@ export default class Disbursements {
    * @returns A promise that resolves to the refund reference ID
    */
   public refund(refundRequest: RefundRequest): Promise<string> {
-    const referenceId: string = uuid();
     return validateRefundRequest(refundRequest).then(() => {
+      const referenceId = resolveReferenceId(refundRequest.referenceId);
       return this.client
         .post<void>(
           "/disbursement/v1_0/refund",
@@ -323,8 +341,8 @@ export default class Disbursements {
    * @returns A promise that resolves to the refund reference ID
    */
   public refundV2(refundRequest: RefundRequest): Promise<string> {
-    const referenceId: string = uuid();
     return validateRefundRequest(refundRequest).then(() => {
+      const referenceId = resolveReferenceId(refundRequest.referenceId);
       return this.client
         .post<void>(
           "/disbursement/v2_0/refund",
@@ -354,7 +372,9 @@ export default class Disbursements {
    */
   public getRefund(referenceId: string): Promise<Refund> {
     return this.client
-      .get<Refund>(`/disbursement/v1_0/refund/${referenceId}`)
+      .get<Refund>(
+        `/disbursement/v1_0/refund/${pathUuid(referenceId)}`,
+      )
       .then((response) => response.data)
       .then((refund) => {
         if (refund.status === TransactionStatus.FAILED) {
@@ -375,9 +395,11 @@ export default class Disbursements {
     partyIdType: PartyIdType,
     partyId: string,
   ): Promise<BasicUserInfo> {
+    const safeType = pathPartyType(partyIdType);
+    const safeId = pathPartyId(safeType, partyId);
     return this.client
       .get<BasicUserInfo>(
-        `/disbursement/v1_0/accountholder/${partyIdType}/${partyId}/basicuserinfo`,
+        `/disbursement/v1_0/accountholder/${safeType}/${safeId}/basicuserinfo`,
       )
       .then((response) => response.data);
   }
@@ -390,7 +412,9 @@ export default class Disbursements {
    */
   public getBalanceInCurrency(currency: string): Promise<Balance> {
     return this.client
-      .get<Balance>(`/disbursement/v1_0/account/balance/${currency}`)
+      .get<Balance>(
+        `/disbursement/v1_0/account/balance/${pathCurrency(currency)}`,
+      )
       .then((response) => response.data);
   }
 
@@ -436,9 +460,16 @@ export default class Disbursements {
    *
    * @returns A promise that resolves to the user's information and KYC consent details
    */
-  public getUserInfoWithConsent(): Promise<ConsentKycResponse> {
+  public getUserInfoWithConsent(
+    consentToken: string,
+  ): Promise<ConsentKycResponse> {
+    validateAccessToken(consentToken);
     return this.client
-      .get<ConsentKycResponse>("/disbursement/oauth2/v1_0/userinfo")
+      .get<ConsentKycResponse>("/disbursement/oauth2/v1_0/userinfo", {
+        headers: {
+          Authorization: `Bearer ${consentToken}`,
+        },
+      })
       .then((response) => response.data);
   }
 
@@ -455,9 +486,11 @@ export default class Disbursements {
     params.append("grant_type", request.grant_type);
     params.append("auth_req_id", request.auth_req_id);
 
+    const basicAuthToken = createBasicAuthToken(this.config);
     return this.client
       .post<OAuth2TokenResponse>("/disbursement/oauth2/token/", params, {
         headers: {
+          Authorization: `Basic ${basicAuthToken}`,
           "Content-Type": "application/x-www-form-urlencoded",
         },
       })

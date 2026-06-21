@@ -11,7 +11,9 @@ This SDK provides a type-safe, developer-friendly interface for integrating MTN 
 - **V1 & V2 Coexistence**: Use stable V1 endpoints by default or opt-in to V2 features (`depositV2`, `refundV2`, `requestToWithdrawV2`, `cashTransfer`).
 - **Comprehensive Coverage**: Request-to-pay, transfers, deposits, refunds, withdrawals, BC Authorize, OAuth2 consent, delivery notifications, and more.
 - **TypeScript First**: Full type definitions for all requests, responses, and errors.
-- **Bun & Node.js**: Works with modern runtimes.
+- **Bun & Node.js**: Supports Node.js 20.19+ and Bun.
+- **Retry-safe references**: Callers can generate and persist MTN reference IDs before dispatch.
+- **Secure transport and errors**: Production requires HTTPS and public errors never expose request credentials.
 
 ---
 
@@ -35,8 +37,12 @@ import { create, Environment } from "@maxkabechani/mtn-momo-sdk";
 const momo = create({
   callbackHost: "yourdomain.com",
   environment: Environment.SANDBOX, // or Environment.PRODUCTION
+  timeoutMs: 30_000,                // optional
+  maxResponseBytes: 1024 * 1024,    // optional
 });
 ```
+
+Production additionally requires an explicit HTTPS `baseUrl`. HTTP is rejected.
 
 ### 2. Provision Sandbox Credentials
 
@@ -64,6 +70,28 @@ const collections = momo.Collections({
   userSecret: apiKey,
 });
 ```
+
+### 4. Persist references before financial requests
+
+Production applications must generate and persist the MTN reference before the
+first attempt. Reuse the same value after timeouts or ambiguous network errors.
+
+```ts
+import { generateReferenceId } from "@maxkabechani/mtn-momo-sdk";
+
+const referenceId = generateReferenceId();
+await saveReferenceForRetry(referenceId);
+
+await collections.requestToPay({
+  referenceId,
+  amount: "500",
+  currency: "EUR",
+  payer: { partyIdType: "MSISDN", partyId: "46733123454" },
+});
+```
+
+If `referenceId` is omitted, the SDK still generates one for compatibility.
+That fallback must not be used by applications that retry financial operations.
 
 ---
 
@@ -213,7 +241,9 @@ Requests a payment from a consumer (payer).
 - **Errors**: Validation errors for missing/invalid fields
 
 ```ts
-const referenceId = await collections.requestToPay({
+const referenceId = generateReferenceId();
+await collections.requestToPay({
+  referenceId,
   amount: "500",
   currency: "EUR",
   externalId: "order-123",
@@ -340,10 +370,11 @@ const authResult = await collections.bcAuthorize({
 });
 ```
 
-#### `getUserInfoWithConsent(): Promise<ConsentKycResponse>`
+#### `getUserInfoWithConsent(consentToken: string): Promise<ConsentKycResponse>`
 
 Retrieves user information with KYC consent (requires prior OAuth2 authorization).
 
+- **Arguments**: `consentToken` — the access token returned by `getOAuth2Token`
 - **Returns**: User info including `sub`, `name`, `phone_number`, `status`
 
 #### `getOAuth2Token(request: OAuth2TokenRequest): Promise<OAuth2TokenResponse>`
@@ -358,6 +389,8 @@ const token = await collections.getOAuth2Token({
   grant_type: "urn:openid:params:grant-type:ciba",
   auth_req_id: authResult.auth_req_id,
 });
+
+const userInfo = await collections.getUserInfoWithConsent(token.access_token);
 ```
 
 ---
@@ -660,12 +693,34 @@ try {
    const momo = create({
      callbackHost: "production-api.yoursite.com",
      environment: Environment.PRODUCTION,
+     baseUrl: "https://your-approved-mtn-production-host.example",
    });
    ```
 
 2. **Use production credentials** from the [MTN MoMo Developer Portal](https://momodeveloper.mtn.com/).
 
-3. **Endpoints**: The SDK handles the URL switch automatically.
+3. **Transport**: Production URLs must be valid HTTPS URLs without embedded credentials, queries, or fragments.
+
+4. **Provisioning**: `Users` is sandbox-only and rejects production use before network dispatch.
+
+---
+
+## Version 1 migration
+
+Version 1 contains security-related behavior changes:
+
+- Every financial request accepts `referenceId?: string`. Generate and persist it before the first attempt and reuse it on retries.
+- `getUserInfoWithConsent` now requires an explicit consent token.
+- Production requires an explicit HTTPS `baseUrl`.
+- Dynamic status, currency, party, and user identifiers are runtime-validated.
+- Financial amounts must be complete positive decimal strings.
+- The SDK preserves decimal strings exactly. Confirm currency-specific provider
+  precision and scale limits with MTN before production use.
+- Public network errors expose only a redacted request summary; do not inspect raw `error.config.headers`.
+- Requests reject redirects, default to a 30-second timeout, and limit responses to 1 MiB unless configured otherwise.
+- Node.js 20.19 or newer is required.
+
+See [`MIGRATION.md`](./MIGRATION.md) for a compact adapter migration checklist.
 
 ---
 
@@ -706,10 +761,15 @@ const collections = momo.Collections({
 
 ```bash
 bun install
-bun run test         # Run all tests (unit + integration)
+bun run test         # Run all tests; live sandbox tests skip without keys
+bun run test:security # Run the security regression suite
+bun run test:integration # Run deterministic public-factory integration tests
+bun run test:integration:live # Run credential-gated MTN sandbox tests
 bun run test:coverage # Run tests with coverage
 bun run typecheck    # Type check
+bun run lint         # Static project checks
 bun run build        # Build for production (ESM + CJS)
+bun run test:package # Packed Node ESM/CJS, Bun, and declarations
 ```
 
 ## License

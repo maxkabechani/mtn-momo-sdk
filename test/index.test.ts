@@ -1,4 +1,3 @@
-import { AssertionError } from "assert";
 import { expect } from "vitest";
 
 import * as momo from "../src";
@@ -7,7 +6,7 @@ describe("MomoClient", function () {
   describe("#create", function () {
     describe("when there is no callback host", function () {
       it("throws an error", function () {
-        expect(momo.create.bind(null, {})).toThrow(AssertionError);
+        expect(momo.create.bind(null, {})).toThrow("callbackHost is required");
       });
     });
 

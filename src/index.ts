@@ -1,5 +1,5 @@
-export type { Payment, PaymentRequest } from "./collections";
-export type { Transfer, TransferRequest } from "./disbursements";
+export type { Payment, PaymentRequest } from "./collections.js";
+export type { Transfer, TransferRequest } from "./disbursements.js";
 export type {
   Withdrawal,
   WithdrawalRequest,
@@ -9,13 +9,17 @@ export type {
   RefundRequest,
   CashTransfer,
   CashTransferRequest,
-} from "./common";
-export * from "./errors";
+} from "./common.js";
+export * from "./errors.js";
+export {
+  generateReferenceId,
+  type FinancialOperationOptions,
+} from "./security.js";
 export {
   PartyIdType as PayerType,
   TransactionStatus as Status,
   Environment,
-} from "./common";
+} from "./common.js";
 export type {
   ApiUserInfo,
   Party as Payer,
@@ -30,35 +34,35 @@ export type {
   OAuth2TokenResponse,
   ConsentKycResponse,
   DeliveryNotification,
-} from "./common";
+} from "./common.js";
 
-import type { HttpClient } from "./httpClient";
+import type { HttpClient } from "./httpClient.js";
 
-import Collections from "./collections";
-import Disbursements from "./disbursements";
-import Remittance from "./remittance";
-import Users from "./users";
+import Collections from "./collections.js";
+import Disbursements from "./disbursements.js";
+import Remittance from "./remittance.js";
+import Users from "./users.js";
 
 import {
   authorizeCollections,
   authorizeDisbursements,
   authorizeRemittance,
   createTokenRefresher,
-} from "./auth";
-import { createAuthClient, createClient } from "./client";
+} from "./auth.js";
+import { createAuthClient, createClient } from "./client.js";
 import {
   validateGlobalConfig,
   validateProductConfig,
   validateSubscriptionConfig,
-} from "./validate";
+} from "./validate.js";
 
-import { Environment } from "./common";
+import { Environment } from "./common.js";
 import type {
   Config,
   GlobalConfig,
   ProductConfig,
   SubscriptionConfig,
-} from "./common";
+} from "./common.js";
 
 export interface MomoClient {
   Collections(productConfig: ProductConfig): Collections;
@@ -142,7 +146,7 @@ export function create(globalConfig: GlobalConfig): MomoClient {
 
       const client: HttpClient = createClient(config);
 
-      return new Users(client);
+      return new Users(client, config.environment ?? Environment.SANDBOX);
     },
   };
 }

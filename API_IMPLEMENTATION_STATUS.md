@@ -55,6 +55,12 @@ All core products (Collections, Disbursements, Remittance) have been updated to 
 
 ## Testing Summary
 
-- **Unit Tests**: 123 passing across 9 test files
-- **Integration Tests**: 29 passing against live Sandbox API
-- **Type Check**: Clean, no errors
+- **Deterministic Tests**: Unit, security-regression, and public-factory
+  integration coverage run locally without MTN credentials.
+- **Live Sandbox Tests**: 29 credential-gated tests are available through
+  `bun run test:integration:live`; they are skipped unless all three product
+  subscription keys are configured. All 29 passed against the configured MTN
+  sandbox on June 21, 2026.
+- **Packed Artifact**: Node ESM, Node CJS, Bun import, and TypeScript
+  declaration resolution are covered by `bun run test:package`.
+- **Type Check**: Clean, no errors.

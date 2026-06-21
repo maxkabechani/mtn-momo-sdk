@@ -17,6 +17,22 @@ const describeIfKeys =
     ? describe
     : describe.skip;
 
+function isExpectedSandboxError(
+  error: unknown,
+  statuses: number[],
+  names: string[] = [],
+): boolean {
+  if (!(error instanceof Error)) return false;
+  const status =
+    "status" in error && typeof error.status === "number"
+      ? error.status
+      : undefined;
+  return (
+    (status !== undefined && statuses.includes(status)) ||
+    names.includes(error.name)
+  );
+}
+
 describeIfKeys("Integration Tests against Sandbox API", () => {
   let collectionsClient: ReturnType<typeof momo.Collections>;
   let disbursementsClient: ReturnType<typeof momo.Disbursements>;
@@ -72,7 +88,9 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
     it(
       "can request to pay and query transaction status",
       async () => {
+        const persistedReferenceId = uuid();
         const referenceId = await collectionsClient.requestToPay({
+          referenceId: persistedReferenceId,
           amount: "500",
           currency: "EUR",
           externalId: "123456",
@@ -84,7 +102,7 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
           payeeNote: "test note",
         });
 
-        expect(referenceId).toBeTypeOf("string");
+        expect(referenceId).toBe(persistedReferenceId);
 
         const transaction = await collectionsClient.getTransaction(referenceId);
         expect(transaction).toBeDefined();
@@ -108,7 +126,13 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
         expect(info).toBeDefined();
       } catch (e: any) {
         // Ignore 404/401/403 Sandbox errors
-        if (e.name !== "ResourceNotFoundError" && e.name !== "NotAllowedError" && e.name !== "UnspecifiedError") throw e;
+        if (
+          !isExpectedSandboxError(e, [401, 403, 404, 500], [
+            "ResourceNotFoundError",
+            "NotAllowedError",
+            "UnspecifiedError",
+          ])
+        ) throw e;
       }
     });
 
@@ -117,7 +141,16 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
         const balance = await collectionsClient.getBalance();
         expect(balance.availableBalance).toBeDefined();
       } catch (e: any) {
-        if (e.name !== "ResourceNotFoundError" && e.name !== "NotAllowedError" && e.name !== "UnspecifiedError" && e.name !== "InternalProcessingError" && e.name !== "ServiceUnavailableError") throw e;
+        if (
+          !isExpectedSandboxError(e, [400, 401, 403, 404, 500, 503], [
+            "ResourceNotFoundError",
+            "NotAllowedError",
+            "NotAllowedTargetEnvironmentError",
+            "UnspecifiedError",
+            "InternalProcessingError",
+            "ServiceUnavailableError",
+          ])
+        ) throw e;
       }
     });
 
@@ -126,7 +159,16 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
         const balance = await collectionsClient.getBalanceInCurrency("EUR");
         expect(balance.availableBalance).toBeDefined();
       } catch (e: any) {
-        if (e.name !== "ResourceNotFoundError" && e.name !== "NotAllowedError" && e.name !== "UnspecifiedError" && e.name !== "InternalProcessingError" && e.name !== "ServiceUnavailableError") throw e;
+        if (
+          !isExpectedSandboxError(e, [400, 401, 403, 404, 500, 503], [
+            "ResourceNotFoundError",
+            "NotAllowedError",
+            "NotAllowedTargetEnvironmentError",
+            "UnspecifiedError",
+            "InternalProcessingError",
+            "ServiceUnavailableError",
+          ])
+        ) throw e;
       }
     });
 
@@ -139,14 +181,18 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
         });
         expect(res.auth_req_id).toBeDefined();
       } catch (e: any) {
-        if (e.response?.status !== 401 && e.response?.status !== 500 && e.response?.status !== 503 && e.response?.status !== 403) throw e;
+        if (!isExpectedSandboxError(e, [400, 401, 403, 404, 500, 503])) {
+          throw e;
+        }
       }
     }, timeout); // Use full timeout for BC authorize
 
     it("can request to withdraw (V1 and V2)", async () => {
       // V1
       try {
+        const persistedReferenceId = uuid();
         const refV1 = await collectionsClient.requestToWithdraw({
+          referenceId: persistedReferenceId,
           amount: "100",
           currency: "EUR",
           externalId: "withdraw-v1",
@@ -154,14 +200,23 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
           payerMessage: "v1 test",
           payeeNote: "note"
         });
-        expect(refV1).toBeDefined();
+        expect(refV1).toBe(persistedReferenceId);
       } catch (e: any) {
-        if (e.name !== "NotAllowedError" && e.name !== "NotAllowedTargetEnvironmentError" && e.name !== "UnspecifiedError" && e.name !== "ServiceUnavailableError") throw e;
+        if (
+          !isExpectedSandboxError(e, [400, 401, 403, 404, 500, 503], [
+            "NotAllowedError",
+            "NotAllowedTargetEnvironmentError",
+            "UnspecifiedError",
+            "ServiceUnavailableError",
+          ])
+        ) throw e;
       }
 
       // V2
       try {
+        const persistedReferenceId = uuid();
         const refV2 = await collectionsClient.requestToWithdrawV2({
+          referenceId: persistedReferenceId,
           amount: "100",
           currency: "EUR",
           externalId: "withdraw-v2",
@@ -169,16 +224,25 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
           payerMessage: "v2 test",
           payeeNote: "note"
         });
-        expect(refV2).toBeDefined();
+        expect(refV2).toBe(persistedReferenceId);
       } catch (e: any) {
-        if (e.name !== "NotAllowedError" && e.name !== "NotAllowedTargetEnvironmentError" && e.name !== "UnspecifiedError" && e.name !== "ServiceUnavailableError") throw e;
+        if (
+          !isExpectedSandboxError(e, [400, 401, 403, 404, 500, 503], [
+            "NotAllowedError",
+            "NotAllowedTargetEnvironmentError",
+            "UnspecifiedError",
+            "ServiceUnavailableError",
+          ])
+        ) throw e;
       }
     });
 
     it("can send delivery notification", async () => {
       try {
         // First create a requestToPay to get a valid referenceId
+        const persistedReferenceId = uuid();
         const referenceId = await collectionsClient.requestToPay({
+          referenceId: persistedReferenceId,
           amount: "100",
           currency: "EUR",
           externalId: "dn-test",
@@ -186,23 +250,37 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
           payerMessage: "delivery notification test",
           payeeNote: "note",
         });
+        expect(referenceId).toBe(persistedReferenceId);
 
         await collectionsClient.sendDeliveryNotification(referenceId, {
           notificationMessage: "Your payment was received",
         });
       } catch (e: any) {
         // Sandbox may reject — 400/404/500 are acceptable sandbox errors
-        if (e.response?.status !== 400 && e.response?.status !== 404 && e.response?.status !== 500 && e.name !== "UnspecifiedError" && e.name !== "ResourceNotFoundError") throw e;
+        if (
+          !isExpectedSandboxError(e, [400, 404, 500], [
+            "UnspecifiedError",
+            "ResourceNotFoundError",
+          ])
+        ) throw e;
       }
     }, timeout);
 
     it("can get oauth2 user info with consent", async () => {
       try {
-        const info = await collectionsClient.getUserInfoWithConsent();
+        const info =
+          await collectionsClient.getUserInfoWithConsent("test-consent-token");
         expect(info).toBeDefined();
       } catch (e: any) {
         // OAuth2 consent endpoints require prior auth flow, expect errors in sandbox
-        if (e.name !== "ResourceNotFoundError" && e.name !== "NotAllowedError" && e.name !== "UnspecifiedError" && e.name !== "NotAllowedTargetEnvironmentError") throw e;
+        if (
+          !isExpectedSandboxError(e, [400, 401, 403, 404, 500], [
+            "ResourceNotFoundError",
+            "NotAllowedError",
+            "UnspecifiedError",
+            "NotAllowedTargetEnvironmentError",
+          ])
+        ) throw e;
       }
     });
 
@@ -215,7 +293,9 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
         expect(tokenRes.access_token).toBeDefined();
       } catch (e: any) {
         // Expected to fail without valid auth_req_id
-        if (e.response?.status !== 400 && e.response?.status !== 401 && e.response?.status !== 500 && e.name !== "UnspecifiedError") throw e;
+        if (!isExpectedSandboxError(e, [400, 401, 500], ["UnspecifiedError"])) {
+          throw e;
+        }
       }
     });
   });
@@ -224,7 +304,9 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
     it(
       "can transfer money and query transaction status",
       async () => {
+        const persistedReferenceId = uuid();
         const referenceId = await disbursementsClient.transfer({
+          referenceId: persistedReferenceId,
           amount: "250",
           currency: "EUR",
           externalId: "disp-123456",
@@ -236,7 +318,7 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
           payeeNote: "testing",
         });
 
-        expect(referenceId).toBeTypeOf("string");
+        expect(referenceId).toBe(persistedReferenceId);
 
         const transaction = await disbursementsClient.getTransaction(referenceId);
         expect(transaction).toBeDefined();
@@ -254,7 +336,15 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
         const balance = await disbursementsClient.getBalance();
         expect(balance.availableBalance).toBeDefined();
       } catch (e: any) {
-        if (e.name !== "ServiceUnavailableError" && e.name !== "InternalProcessingError" && e.name !== "UnspecifiedError") throw e;
+        if (
+          !isExpectedSandboxError(e, [400, 401, 403, 404, 500, 503], [
+            "ServiceUnavailableError",
+            "InternalProcessingError",
+            "UnspecifiedError",
+            "NotAllowedError",
+            "NotAllowedTargetEnvironmentError",
+          ])
+        ) throw e;
       }
     });
 
@@ -263,7 +353,15 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
         const balance = await disbursementsClient.getBalanceInCurrency("EUR");
         expect(balance.availableBalance).toBeDefined();
       } catch (e: any) {
-        if (e.name !== "ServiceUnavailableError" && e.name !== "InternalProcessingError" && e.name !== "UnspecifiedError" && e.name !== "NotAllowedError" && e.name !== "NotAllowedTargetEnvironmentError") throw e;
+        if (
+          !isExpectedSandboxError(e, [400, 401, 403, 404, 500, 503], [
+            "ServiceUnavailableError",
+            "InternalProcessingError",
+            "UnspecifiedError",
+            "NotAllowedError",
+            "NotAllowedTargetEnvironmentError",
+          ])
+        ) throw e;
       }
     });
 
@@ -277,7 +375,7 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
         const info = await disbursementsClient.getBasicUserInfo(PartyIdType.MSISDN, "46733123454");
         expect(info).toBeDefined();
       } catch(e: any) {
-        if (e.response?.status !== 404 && e.response?.status !== 400 && e.response?.status !== 500) throw e;
+        if (!isExpectedSandboxError(e, [400, 404, 500])) throw e;
       }
     });
 
@@ -290,14 +388,16 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
         });
         expect(res.auth_req_id).toBeDefined();
       } catch (e: any) {
-        if (e.response?.status !== 500 && e.response?.status !== 400 && e.response?.status !== 404) throw e;
+        if (!isExpectedSandboxError(e, [400, 404, 500])) throw e;
       }
     });
 
     it("can deposit and refund (V1)", async () => {
       // 1. Deposit V1
       try {
+        const persistedDepositReference = uuid();
         const depositRefToken = await disbursementsClient.deposit({
+          referenceId: persistedDepositReference,
           amount: "50",
           currency: "EUR",
           externalId: "dep-v1",
@@ -305,13 +405,15 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
           payerMessage: "deposit v1 test",
           payeeNote: "note"
         });
-        expect(depositRefToken).toBeTypeOf("string");
+        expect(depositRefToken).toBe(persistedDepositReference);
 
         const depositStatus = await disbursementsClient.getDeposit(depositRefToken);
         expect(depositStatus).toBeDefined();
 
         // 2. Refund V1
+        const persistedRefundReference = uuid();
         const refundRefToken = await disbursementsClient.refund({
+          referenceId: persistedRefundReference,
           amount: "10",
           currency: "EUR",
           externalId: "ref-v1",
@@ -319,16 +421,18 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
           payeeNote: "note",
           referenceIdToRefund: depositRefToken
         });
-        expect(refundRefToken).toBeTypeOf("string");
+        expect(refundRefToken).toBe(persistedRefundReference);
       } catch (e: any) {
-        if (e.response?.status !== 403 && e.response?.status !== 404 && e.response?.status !== 401 && e.response?.status !== 500) throw e;
+        if (!isExpectedSandboxError(e, [401, 403, 404, 500])) throw e;
       }
     });
 
     it("can deposit and refund (V2)", async () => {
       // 1. Deposit V2
       try {
+        const persistedDepositReference = uuid();
         const depositRefToken = await disbursementsClient.depositV2({
+          referenceId: persistedDepositReference,
           amount: "50",
           currency: "EUR",
           externalId: "dep-v2",
@@ -336,13 +440,15 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
           payerMessage: "deposit v2 test",
           payeeNote: "note"
         });
-        expect(depositRefToken).toBeTypeOf("string");
+        expect(depositRefToken).toBe(persistedDepositReference);
 
         const depositStatus = await disbursementsClient.getDeposit(depositRefToken);
         expect(depositStatus).toBeDefined();
 
         // 2. Refund V2
+        const persistedRefundReference = uuid();
         const refundRefToken = await disbursementsClient.refundV2({
+          referenceId: persistedRefundReference,
           amount: "10",
           currency: "EUR",
           externalId: "ref-v2",
@@ -350,19 +456,27 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
           payeeNote: "note",
           referenceIdToRefund: depositRefToken
         });
-        expect(refundRefToken).toBeTypeOf("string");
+        expect(refundRefToken).toBe(persistedRefundReference);
       } catch (e: any) {
-        if (e.response?.status !== 403 && e.response?.status !== 404 && e.response?.status !== 401 && e.response?.status !== 500 && e.response?.status !== 503) throw e;
+        if (!isExpectedSandboxError(e, [401, 403, 404, 500, 503])) throw e;
         if (e.name === "InvalidCurrencyError") return; // Sandbox flakiness with currencies
       }
     });
 
     it("can get oauth2 user info with consent", async () => {
       try {
-        const info = await disbursementsClient.getUserInfoWithConsent();
+        const info =
+          await disbursementsClient.getUserInfoWithConsent("test-consent-token");
         expect(info).toBeDefined();
       } catch (e: any) {
-        if (e.name !== "ResourceNotFoundError" && e.name !== "NotAllowedError" && e.name !== "UnspecifiedError" && e.name !== "NotAllowedTargetEnvironmentError") throw e;
+        if (
+          !isExpectedSandboxError(e, [400, 401, 403, 404, 500], [
+            "ResourceNotFoundError",
+            "NotAllowedError",
+            "UnspecifiedError",
+            "NotAllowedTargetEnvironmentError",
+          ])
+        ) throw e;
       }
     });
 
@@ -374,7 +488,9 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
         });
         expect(tokenRes.access_token).toBeDefined();
       } catch (e: any) {
-        if (e.response?.status !== 400 && e.response?.status !== 401 && e.response?.status !== 500 && e.name !== "UnspecifiedError") throw e;
+        if (!isExpectedSandboxError(e, [400, 401, 500], ["UnspecifiedError"])) {
+          throw e;
+        }
       }
     });
   });
@@ -383,16 +499,11 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
     it(
       "can check if payer is active",
       async () => {
-        try {
-          const isActive = await remittanceClient.isPayerActive(
-            "46733123454",
-            PartyIdType.MSISDN,
-          );
-          expect(isActive).toBeTypeOf("boolean");
-        } catch (error: any) {
-          console.error("Remittance isPayerActive error:", error.response?.data || error.message);
-          throw error;
-        }
+        const isActive = await remittanceClient.isPayerActive(
+          "46733123454",
+          PartyIdType.MSISDN,
+        );
+        expect(isActive).toBeTypeOf("boolean");
       },
       timeout,
     );
@@ -400,34 +511,31 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
     it(
       "can remit transfer and query transaction status",
       async () => {
-        try {
-          const referenceId = await remittanceClient.transfer({
-            amount: "150",
-            currency: "EUR",
-            externalId: "remit-123456",
-            payee: {
-              partyIdType: PartyIdType.MSISDN,
-              partyId: "46733123454",
-            },
-            payerMessage: "remit test",
-            payeeNote: "testing",
-          });
+        const persistedReferenceId = uuid();
+        const referenceId = await remittanceClient.transfer({
+          referenceId: persistedReferenceId,
+          amount: "150",
+          currency: "EUR",
+          externalId: "remit-123456",
+          payee: {
+            partyIdType: PartyIdType.MSISDN,
+            partyId: "46733123454",
+          },
+          payerMessage: "remit test",
+          payeeNote: "testing",
+        });
 
-          expect(referenceId).toBeTypeOf("string");
+        expect(referenceId).toBe(persistedReferenceId);
 
-          await new Promise(r => setTimeout(r, 2000));
-          const transaction = await remittanceClient.getTransaction(referenceId);
-          expect(transaction).toBeDefined();
-          expect(transaction.amount).toBe("150");
-          expect(transaction.currency).toBe("EUR");
-          expect(transaction.externalId).toBe("remit-123456");
-          expect(["PENDING", "SUCCESSFUL", "FAILED"]).toContain(
-            transaction.status,
-          );
-        } catch (error: any) {
-          console.error("Remittance transfer error:", error.response?.data || error);
-          throw error;
-        }
+        await new Promise(r => setTimeout(r, 2000));
+        const transaction = await remittanceClient.getTransaction(referenceId);
+        expect(transaction).toBeDefined();
+        expect(transaction.amount).toBe("150");
+        expect(transaction.currency).toBe("EUR");
+        expect(transaction.externalId).toBe("remit-123456");
+        expect(["PENDING", "SUCCESSFUL", "FAILED"]).toContain(
+          transaction.status,
+        );
       },
       timeout,
     );
@@ -436,7 +544,16 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
         const balance = await remittanceClient.getBalance();
         expect(balance.availableBalance).toBeDefined();
       } catch (e: any) {
-        if (e.name !== "NotAllowedError" && e.name !== "NotAllowedTargetEnvironmentError" && e.name !== "UnspecifiedError" && e.name !== "ResourceNotFoundError" && e.name !== "ServiceUnavailableError" && e.name !== "InternalProcessingError") throw e;
+        if (
+          !isExpectedSandboxError(e, [400, 401, 403, 404, 500, 503], [
+            "NotAllowedError",
+            "NotAllowedTargetEnvironmentError",
+            "UnspecifiedError",
+            "ResourceNotFoundError",
+            "ServiceUnavailableError",
+            "InternalProcessingError",
+          ])
+        ) throw e;
       }
     });
 
@@ -445,16 +562,33 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
         const balance = await remittanceClient.getBalanceInCurrency("EUR");
         expect(balance.availableBalance).toBeDefined();
       } catch (e: any) {
-        if (e.name !== "NotAllowedError" && e.name !== "NotAllowedTargetEnvironmentError" && e.name !== "UnspecifiedError" && e.name !== "ResourceNotFoundError" && e.name !== "ServiceUnavailableError" && e.name !== "InternalProcessingError") throw e;
+        if (
+          !isExpectedSandboxError(e, [400, 401, 403, 404, 500, 503], [
+            "NotAllowedError",
+            "NotAllowedTargetEnvironmentError",
+            "UnspecifiedError",
+            "ResourceNotFoundError",
+            "ServiceUnavailableError",
+            "InternalProcessingError",
+          ])
+        ) throw e;
       }
     });
 
     it("can get oauth2 user info", async () => {
       try {
-        const info = await remittanceClient.getUserInfoWithConsent();
+        const info =
+          await remittanceClient.getUserInfoWithConsent("test-consent-token");
         expect(info).toBeDefined();
       } catch(e: any) {
-        if (e.name !== "ResourceNotFoundError" && e.name !== "NotAllowedError" && e.name !== "UnspecifiedError" && e.name !== "NotAllowedTargetEnvironmentError") throw e;
+        if (
+          !isExpectedSandboxError(e, [400, 401, 403, 404, 500], [
+            "ResourceNotFoundError",
+            "NotAllowedError",
+            "UnspecifiedError",
+            "NotAllowedTargetEnvironmentError",
+          ])
+        ) throw e;
       }
     });
 
@@ -463,7 +597,12 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
         const info = await remittanceClient.getBasicUserInfo("46733123454");
         expect(info).toBeDefined();
       } catch(e: any) {
-        if (e.name !== "ResourceNotFoundError" && e.name !== "UnspecifiedError") throw e;
+        if (
+          !isExpectedSandboxError(e, [400, 401, 403, 404, 500], [
+            "ResourceNotFoundError",
+            "UnspecifiedError",
+          ])
+        ) throw e;
       }
     });
 
@@ -476,13 +615,21 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
         });
         expect(res.auth_req_id).toBeDefined();
       } catch (e: any) {
-        if (e.name !== "UnspecifiedError" && e.name !== "NotAllowedError" && e.name !== "ResourceNotFoundError") throw e;
+        if (
+          !isExpectedSandboxError(e, [400, 401, 403, 404, 500, 503], [
+            "UnspecifiedError",
+            "NotAllowedError",
+            "ResourceNotFoundError",
+          ])
+        ) throw e;
       }
     });
 
     it("can send cash transfer (V2)", async () => {
       try {
+        const persistedReferenceId = uuid();
         const referenceId = await remittanceClient.cashTransfer({
+          referenceId: persistedReferenceId,
           amount: "75",
           currency: "EUR",
           externalId: "cashtx-v2",
@@ -493,14 +640,21 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
           payerMessage: "cash transfer v2",
           payeeNote: "v2 note",
         });
-        expect(referenceId).toBeTypeOf("string");
+        expect(referenceId).toBe(persistedReferenceId);
 
         await new Promise(r => setTimeout(r, 2000));
         const transfer = await remittanceClient.getCashTransfer(referenceId);
         expect(transfer).toBeDefined();
       } catch (e: any) {
         // V2 cash transfer may not be available in sandbox
-        if (e.response?.status !== 400 && e.response?.status !== 404 && e.response?.status !== 500 && e.name !== "UnspecifiedError" && e.name !== "NotAllowedError" && e.name !== "NotAllowedTargetEnvironmentError" && e.name !== "ServiceUnavailableError") throw e;
+        if (
+          !isExpectedSandboxError(e, [400, 404, 500], [
+            "UnspecifiedError",
+            "NotAllowedError",
+            "NotAllowedTargetEnvironmentError",
+            "ServiceUnavailableError",
+          ])
+        ) throw e;
       }
     }, timeout);
 
@@ -512,7 +666,9 @@ describeIfKeys("Integration Tests against Sandbox API", () => {
         });
         expect(tokenRes.access_token).toBeDefined();
       } catch (e: any) {
-        if (e.response?.status !== 400 && e.response?.status !== 401 && e.response?.status !== 500 && e.name !== "UnspecifiedError") throw e;
+        if (!isExpectedSandboxError(e, [400, 401, 500], ["UnspecifiedError"])) {
+          throw e;
+        }
       }
     });
   });

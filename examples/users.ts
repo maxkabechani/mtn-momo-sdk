@@ -1,4 +1,5 @@
 import * as momo from "../src";
+import { logSafeError } from "./safe-error.ts";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -21,13 +22,13 @@ async function main(): Promise<void> {
   console.log({ userId });
 
   const user = await users.getApiUser(userId);
-  console.log({ user });
+  console.log({ providerCallbackHost: user.providerCallbackHost });
 
-  const credentials = await users.login(userId);
-  console.log({ credentials });
+  await users.login(userId);
+  console.log("Sandbox API key created. Store it securely; it is not printed.");
 }
 
 main().catch((error) => {
-  console.error(error);
+  logSafeError(error);
   process.exitCode = 1;
 });

@@ -1,8 +1,9 @@
-import type { HttpClient } from "./httpClient";
+import type { HttpClient } from "./httpClient.js";
 
-import { createClient } from "./client";
+import { createClient } from "./client.js";
 
-import type { AccessToken, Config, UserConfig } from "./common";
+import type { AccessToken, Config, UserConfig } from "./common.js";
+import { validateAccessToken } from "./security.js";
 
 export type TokenRefresher = () => Promise<string>;
 
@@ -29,22 +30,44 @@ export function createTokenRefresher(
   config: Config,
 ): TokenRefresher {
   let credentials: OAuthCredentials;
-  return () => {
-    if (isExpired(credentials)) {
-      const isRefreshTokenValid = credentials?.refreshToken && !isRefreshExpired(credentials);
-      
-      const options: AuthorizerOptions = isRefreshTokenValid 
-        ? { grant_type: 'refresh_token', refresh_token: credentials.refreshToken }
-        : { grant_type: 'client_credentials' };
+  let inFlight: Promise<string> | undefined;
 
-      return authorize(config, options)
+  return async () => {
+    if (!isExpired(credentials)) {
+      return credentials.accessToken;
+    }
+    if (inFlight) {
+      return inFlight;
+    }
+
+    if (isExpired(credentials)) {
+      const isRefreshTokenValid =
+        credentials?.refreshToken && !isRefreshExpired(credentials);
+      const options: AuthorizerOptions = isRefreshTokenValid
+        ? {
+            grant_type: "refresh_token",
+            refresh_token: credentials.refreshToken,
+          }
+        : { grant_type: "client_credentials" };
+
+      inFlight = authorize(config, options)
         .then((tokenData) => {
-          const { access_token, expires_in, refresh_token, refresh_token_expired_in } = tokenData;
+          const {
+            access_token,
+            expires_in,
+            refresh_token,
+            refresh_token_expired_in,
+          } = tokenData;
+          validateAccessToken(access_token, "access_token");
+          if (!Number.isFinite(expires_in)) {
+            throw new TypeError("expires_in must be a finite number");
+          }
           const expires: number = Date.now() + expires_in * 1000 - 60000;
-          
+
           let refreshExpires: number | undefined;
           if (refresh_token_expired_in) {
-            refreshExpires = Date.now() + refresh_token_expired_in * 1000 - 60000;
+            refreshExpires =
+              Date.now() + refresh_token_expired_in * 1000 - 60000;
           }
 
           return {
@@ -57,10 +80,15 @@ export function createTokenRefresher(
         .then((freshCredentials) => {
           credentials = freshCredentials;
           return credentials.accessToken;
+        })
+        .finally(() => {
+          inFlight = undefined;
         });
+
+      return inFlight;
     }
 
-    return Promise.resolve(credentials.accessToken);
+    return credentials.accessToken;
   };
 }
 

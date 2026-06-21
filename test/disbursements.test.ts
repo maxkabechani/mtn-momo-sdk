@@ -1,10 +1,14 @@
 import type { HttpClient } from "../src/httpClient";
-import type { FetchFetchMockAdapter } from "./mock";
+import type { FetchMockAdapter } from "./mock";
 import { expect } from "vitest";
 
 import Disbursements from "../src/disbursements";
 
-import { createMock } from "./mock";
+import {
+  createMock,
+  FAILED_REFERENCE_ID,
+  VALID_REFERENCE_ID,
+} from "./mock";
 
 import type { DepositRequest, RefundRequest } from "../src/common";
 import { PartyIdType } from "../src/common";
@@ -128,17 +132,17 @@ describe("Disbursements", function () {
   describe("getTransaction", function () {
     it("makes the correct request", async function () {
       await expect(
-        disbursements.getTransaction("reference"),
+        disbursements.getTransaction(VALID_REFERENCE_ID),
       ).resolves.toBeDefined();
       expect(mockAdapter.history.get).toHaveLength(1);
       expect(mockAdapter.history.get[0]!.url).toBe(
-        "/disbursement/v1_0/transfer/reference",
+        `/disbursement/v1_0/transfer/${VALID_REFERENCE_ID}`,
       );
     });
 
     it("rejects with error when transaction has FAILED status", async function () {
       await expect(
-        disbursements.getTransaction("failed"),
+        disbursements.getTransaction(FAILED_REFERENCE_ID),
       ).rejects.toThrow();
     });
   });
@@ -210,17 +214,17 @@ describe("Disbursements", function () {
   describe("getDeposit", function () {
     it("uses v1 deposit status endpoint", async function () {
       await expect(
-        disbursements.getDeposit("reference"),
+        disbursements.getDeposit(VALID_REFERENCE_ID),
       ).resolves.toBeDefined();
       expect(mockAdapter.history.get).toHaveLength(1);
       expect(mockAdapter.history.get[0]!.url).toBe(
-        "/disbursement/v1_0/deposit/reference",
+        `/disbursement/v1_0/deposit/${VALID_REFERENCE_ID}`,
       );
     });
 
     it("rejects with error when deposit has FAILED status", async function () {
       await expect(
-        disbursements.getDeposit("failed"),
+        disbursements.getDeposit(FAILED_REFERENCE_ID),
       ).rejects.toThrow();
     });
   });
@@ -263,16 +267,18 @@ describe("Disbursements", function () {
 
   describe("getRefund", function () {
     it("uses v1 refund status endpoint", async function () {
-      await expect(disbursements.getRefund("reference")).resolves.toBeDefined();
+      await expect(
+        disbursements.getRefund(VALID_REFERENCE_ID),
+      ).resolves.toBeDefined();
       expect(mockAdapter.history.get).toHaveLength(1);
       expect(mockAdapter.history.get[0]!.url).toBe(
-        "/disbursement/v1_0/refund/reference",
+        `/disbursement/v1_0/refund/${VALID_REFERENCE_ID}`,
       );
     });
 
     it("rejects with error when refund has FAILED status", async function () {
       await expect(
-        disbursements.getRefund("failed"),
+        disbursements.getRefund(FAILED_REFERENCE_ID),
       ).rejects.toThrow();
     });
   });
@@ -324,7 +330,7 @@ describe("Disbursements", function () {
   describe("getUserInfoWithConsent", function () {
     it("makes the correct request", async function () {
       await expect(
-        disbursements.getUserInfoWithConsent(),
+        disbursements.getUserInfoWithConsent("consent-token"),
       ).resolves.toBeDefined();
       expect(mockAdapter.history.get).toHaveLength(1);
       expect(mockAdapter.history.get[0]!.url).toBe(

@@ -1,4 +1,5 @@
 import * as momo from "../src";
+import { logSafeError } from "./safe-error.ts";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -25,6 +26,7 @@ async function main(): Promise<void> {
   };
 
   const depositId = await disbursements.depositV2({
+    referenceId: momo.generateReferenceId(),
     amount: "100",
     currency: "EUR",
     externalId: `dep-${Date.now()}`,
@@ -35,9 +37,10 @@ async function main(): Promise<void> {
   console.log({ depositId });
 
   const deposit = await disbursements.getDeposit(depositId);
-  console.log({ deposit });
+  console.log({ referenceId: depositId, status: deposit.status });
 
   const refundId = await disbursements.refundV2({
+    referenceId: momo.generateReferenceId(),
     amount: "50",
     currency: "EUR",
     externalId: `ref-${Date.now()}`,
@@ -48,19 +51,19 @@ async function main(): Promise<void> {
   console.log({ refundId });
 
   const refund = await disbursements.getRefund(refundId);
-  console.log({ refund });
+  console.log({ referenceId: refundId, status: refund.status });
 
-  const basicUserInfo = await disbursements.getBasicUserInfo(
+  await disbursements.getBasicUserInfo(
     momo.PayerType.MSISDN,
     payee.partyId,
   );
-  console.log({ basicUserInfo });
+  console.log("Basic user information retrieved.");
 
   const currencyBalance = await disbursements.getBalanceInCurrency("EUR");
   console.log({ currencyBalance });
 }
 
 main().catch((error) => {
-  console.error(error);
+  logSafeError(error);
   process.exitCode = 1;
 });

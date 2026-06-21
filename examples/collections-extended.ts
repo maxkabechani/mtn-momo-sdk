@@ -1,4 +1,5 @@
 import * as momo from "../src";
+import { logSafeError } from "./safe-error.ts";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -25,6 +26,7 @@ async function main(): Promise<void> {
   };
 
   const withdrawalId = await collections.requestToWithdraw({
+    referenceId: momo.generateReferenceId(),
     amount: "50",
     currency: "EUR",
     externalId: `wd-${Date.now()}`,
@@ -35,24 +37,24 @@ async function main(): Promise<void> {
   console.log({ withdrawalId });
 
   const withdrawal = await collections.getWithdrawal(withdrawalId);
-  console.log({ withdrawal });
+  console.log({ referenceId: withdrawalId, status: withdrawal.status });
 
   await collections.sendDeliveryNotification(withdrawalId, {
     notificationMessage: "Goods delivered",
   });
   console.log("Delivery notification sent");
 
-  const basicUserInfo = await collections.getBasicUserInfo(
+  await collections.getBasicUserInfo(
     momo.PayerType.MSISDN,
     payee.partyId,
   );
-  console.log({ basicUserInfo });
+  console.log("Basic user information retrieved.");
 
   const currencyBalance = await collections.getBalanceInCurrency("EUR");
   console.log({ currencyBalance });
 }
 
 main().catch((error) => {
-  console.error(error);
+  logSafeError(error);
   process.exitCode = 1;
 });

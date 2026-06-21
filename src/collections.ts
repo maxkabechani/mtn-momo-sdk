@@ -1,8 +1,11 @@
-import type { HttpClient } from "./httpClient";
-import { v4 as uuid } from "uuid";
+import type { HttpClient } from "./httpClient.js";
 
-import { getTransactionError } from "./errors";
-import { validateRequestToPay, validateWithdrawalRequest } from "./validate";
+import { createBasicAuthToken } from "./auth.js";
+import { getTransactionError } from "./errors.js";
+import {
+  validateRequestToPay,
+  validateWithdrawalRequest,
+} from "./validate.js";
 
 import {
   type Balance,
@@ -20,9 +23,18 @@ import {
   TransactionStatus,
   type Withdrawal,
   type WithdrawalRequest,
-} from "./common";
+} from "./common.js";
+import {
+  pathCurrency,
+  pathPartyId,
+  pathPartyType,
+  pathUuid,
+  resolveReferenceId,
+  validateAccessToken,
+  type FinancialOperationOptions,
+} from "./security.js";
 
-export interface PaymentRequest {
+export interface PaymentRequest extends FinancialOperationOptions {
   /**
    * Amount that will be debited from the payer account
    */
@@ -133,12 +145,14 @@ export default class Collections {
    *
    * @param paymentRequest
    */
-  public requestToPay({
-    callbackUrl,
-    ...paymentRequest
-  }: PaymentRequest): Promise<string> {
-    return validateRequestToPay(paymentRequest).then(() => {
-      const referenceId: string = uuid();
+  public requestToPay(request: PaymentRequest): Promise<string> {
+    const {
+      callbackUrl,
+      referenceId: suppliedReferenceId,
+      ...paymentRequest
+    } = request;
+    return validateRequestToPay(request).then(() => {
+      const referenceId = resolveReferenceId(suppliedReferenceId);
       return this.client
         .post<void>("/collection/v1_0/requesttopay", paymentRequest, {
           headers: {
@@ -162,7 +176,9 @@ export default class Collections {
    */
   public getTransaction(referenceId: string): Promise<Payment> {
     return this.client
-      .get<Payment>(`/collection/v1_0/requesttopay/${referenceId}`)
+      .get<Payment>(
+        `/collection/v1_0/requesttopay/${pathUuid(referenceId)}`,
+      )
       .then((response) => response.data)
       .then((transaction) => {
         if (transaction.status === TransactionStatus.FAILED) {
@@ -197,10 +213,11 @@ export default class Collections {
     id: string,
     type: PartyIdType = PartyIdType.MSISDN,
   ): Promise<boolean> {
-    // OpenAPI says msisdn/email should be lowercase for some endpoints
+    const safeType = pathPartyType(type);
+    const safeId = pathPartyId(safeType, id);
     return this.client
       .get<{ result: boolean }>(
-        `/collection/v1_0/accountholder/${type}/${id}/active`,
+        `/collection/v1_0/accountholder/${safeType}/${safeId}/active`,
       )
       .then((response) => response.data)
       .then((data) => (data.result !== undefined ? data.result : false));
@@ -216,8 +233,8 @@ export default class Collections {
   public requestToWithdraw(
     withdrawalRequest: WithdrawalRequest,
   ): Promise<string> {
-    const referenceId: string = uuid();
     return validateWithdrawalRequest(withdrawalRequest).then(() => {
+      const referenceId = resolveReferenceId(withdrawalRequest.referenceId);
       return this.client
         .post<void>(
           "/collection/v1_0/requesttowithdraw",
@@ -252,8 +269,8 @@ export default class Collections {
   public requestToWithdrawV2(
     withdrawalRequest: WithdrawalRequest,
   ): Promise<string> {
-    const referenceId: string = uuid();
     return validateWithdrawalRequest(withdrawalRequest).then(() => {
+      const referenceId = resolveReferenceId(withdrawalRequest.referenceId);
       return this.client
         .post<void>(
           "/collection/v2_0/requesttowithdraw",
@@ -286,7 +303,9 @@ export default class Collections {
    */
   public getWithdrawal(referenceId: string): Promise<Withdrawal> {
     return this.client
-      .get<Withdrawal>(`/collection/v1_0/requesttowithdraw/${referenceId}`)
+      .get<Withdrawal>(
+        `/collection/v1_0/requesttowithdraw/${pathUuid(referenceId)}`,
+      )
       .then((response) => response.data)
       .then((withdrawal) => {
         if (withdrawal.status === TransactionStatus.FAILED) {
@@ -307,9 +326,19 @@ export default class Collections {
     referenceId: string,
     notification: DeliveryNotification,
   ): Promise<void> {
+    if (
+      typeof notification?.notificationMessage !== "string" ||
+      notification.notificationMessage.length === 0 ||
+      notification.notificationMessage.length > 160 ||
+      /[\r\n]/.test(notification.notificationMessage)
+    ) {
+      throw new TypeError(
+        "notificationMessage must be between 1 and 160 characters",
+      );
+    }
     return this.client
       .post<void>(
-        `/collection/v1_0/requesttopay/${referenceId}/deliverynotification`,
+        `/collection/v1_0/requesttopay/${pathUuid(referenceId)}/deliverynotification`,
         null,
         {
           headers: {
@@ -334,9 +363,11 @@ export default class Collections {
     partyIdType: PartyIdType,
     partyId: string,
   ): Promise<BasicUserInfo> {
+    const safeType = pathPartyType(partyIdType);
+    const safeId = pathPartyId(safeType, partyId);
     return this.client
       .get<BasicUserInfo>(
-        `/collection/v1_0/accountholder/${partyIdType}/${partyId}/basicuserinfo`,
+        `/collection/v1_0/accountholder/${safeType}/${safeId}/basicuserinfo`,
       )
       .then((response) => response.data);
   }
@@ -349,7 +380,9 @@ export default class Collections {
    */
   public getBalanceInCurrency(currency: string): Promise<Balance> {
     return this.client
-      .get<Balance>(`/collection/v1_0/account/balance/${currency}`)
+      .get<Balance>(
+        `/collection/v1_0/account/balance/${pathCurrency(currency)}`,
+      )
       .then((response) => response.data);
   }
 
@@ -377,9 +410,11 @@ export default class Collections {
       params.append("scope_instruction", request.scope_instruction);
     }
 
+    const basicAuthToken = createBasicAuthToken(this.config);
     return this.client
       .post<BcAuthorizeResponse>("/collection/v1_0/bc-authorize", params, {
         headers: {
+          Authorization: `Basic ${basicAuthToken}`,
           "Content-Type": "application/x-www-form-urlencoded",
         },
       })
@@ -392,9 +427,16 @@ export default class Collections {
    *
    * @returns A promise that resolves to the user's information and KYC consent details
    */
-  public getUserInfoWithConsent(): Promise<ConsentKycResponse> {
+  public getUserInfoWithConsent(
+    consentToken: string,
+  ): Promise<ConsentKycResponse> {
+    validateAccessToken(consentToken);
     return this.client
-      .get<ConsentKycResponse>("/collection/oauth2/v1_0/userinfo")
+      .get<ConsentKycResponse>("/collection/oauth2/v1_0/userinfo", {
+        headers: {
+          Authorization: `Bearer ${consentToken}`,
+        },
+      })
       .then((response) => response.data);
   }
 
@@ -411,9 +453,11 @@ export default class Collections {
     params.append("grant_type", request.grant_type);
     params.append("auth_req_id", request.auth_req_id);
 
+    const basicAuthToken = createBasicAuthToken(this.config);
     return this.client
       .post<OAuth2TokenResponse>("/collection/oauth2/token/", params, {
         headers: {
+          Authorization: `Basic ${basicAuthToken}`,
           "Content-Type": "application/x-www-form-urlencoded",
         },
       })

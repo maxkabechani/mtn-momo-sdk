@@ -1,19 +1,25 @@
-import type { HttpClientError } from "./httpClient";
-import type { Payment } from "./collections";
-import type { Deposit, Refund, Withdrawal } from "./common";
-import { FailureReason } from "./common";
-import type { Transfer } from "./disbursements";
+import type { Payment } from "./collections.js";
+import type { Deposit, Refund, Withdrawal } from "./common.js";
+import { FailureReason } from "./common.js";
+import type { Transfer } from "./disbursements.js";
+import { HttpClientError } from "./httpClient.js";
+import { redactSensitiveText } from "./security.js";
 
-interface ErrorBody {
-  code: FailureReason;
-  message: string;
+export interface TransactionErrorSummary {
+  status: string;
+  reason?: string;
+  financialTransactionId?: string;
+  externalId?: string;
 }
 
 export class MtnMoMoError extends Error {
-  public transaction?: Payment | Transfer;
+  public transaction?: TransactionErrorSummary;
+  public status?: number;
+  public code?: string;
+  public retryable?: boolean;
 
   constructor(message?: string) {
-    super(message);
+    super(message ? redactSensitiveText(message) : message);
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
@@ -91,13 +97,18 @@ export class UnspecifiedError extends MtnMoMoError {
 }
 
 export function handleError(error: HttpClientError | Error): Error {
-  if (!("response" in error) || !error.response) {
+  if (!(error instanceof HttpClientError) || !error.providerCode) {
     return error;
   }
 
-  const { code, message } = (error.response.data || {}) as Partial<ErrorBody>;
-
-  return getError(code, message);
+  const mapped = getError(
+    error.providerCode as FailureReason,
+    error.providerMessage,
+  );
+  mapped.status = error.status;
+  mapped.code = error.providerCode;
+  mapped.retryable = error.retryable;
+  return mapped;
 }
 
 export function getError(code?: FailureReason, message?: string) {
@@ -176,7 +187,12 @@ export function getTransactionError(
   transaction: Payment | Transfer | Withdrawal | Deposit | Refund,
 ) {
   const error: MtnMoMoError = getError(transaction.reason as FailureReason);
-  error.transaction = transaction as Payment | Transfer;
+  error.transaction = {
+    status: transaction.status,
+    reason: transaction.reason,
+    financialTransactionId: transaction.financialTransactionId,
+    externalId: transaction.externalId,
+  };
 
   return error;
 }

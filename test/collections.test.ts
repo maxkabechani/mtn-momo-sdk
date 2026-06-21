@@ -1,10 +1,14 @@
 import type { HttpClient } from "../src/httpClient";
-import type { FetchFetchMockAdapter } from "./mock";
+import type { FetchMockAdapter } from "./mock";
 import { expect } from "vitest";
 
 import Collections from "../src/collections";
 
-import { createMock } from "./mock";
+import {
+  createMock,
+  FAILED_REFERENCE_ID,
+  VALID_REFERENCE_ID,
+} from "./mock";
 
 import type { PaymentRequest } from "../src/collections";
 import { PartyIdType, type WithdrawalRequest } from "../src/common";
@@ -127,17 +131,17 @@ describe("Collections", function () {
   describe("getTransaction", function () {
     it("makes the correct request", async function () {
       await expect(
-        collections.getTransaction("reference"),
+        collections.getTransaction(VALID_REFERENCE_ID),
       ).resolves.toBeDefined();
       expect(mockAdapter.history.get).toHaveLength(1);
       expect(mockAdapter.history.get[0]?.url).toBe(
-        "/collection/v1_0/requesttopay/reference",
+        `/collection/v1_0/requesttopay/${VALID_REFERENCE_ID}`,
       );
     });
 
     it("rejects with error when transaction has FAILED status", async function () {
       await expect(
-        collections.getTransaction("failed"),
+        collections.getTransaction(FAILED_REFERENCE_ID),
       ).rejects.toThrow();
     });
   });
@@ -203,16 +207,18 @@ describe("Collections", function () {
 
   describe("getWithdrawal", function () {
     it("makes the correct request", async function () {
-      await expect(collections.getWithdrawal("ref1")).resolves.toBeDefined();
+      await expect(
+        collections.getWithdrawal(VALID_REFERENCE_ID),
+      ).resolves.toBeDefined();
       expect(mockAdapter.history.get).toHaveLength(1);
       expect(mockAdapter.history.get[0]?.url).toBe(
-        "/collection/v1_0/requesttowithdraw/ref1",
+        `/collection/v1_0/requesttowithdraw/${VALID_REFERENCE_ID}`,
       );
     });
 
     it("rejects with error when withdrawal has FAILED status", async function () {
       await expect(
-        collections.getWithdrawal("failed"),
+        collections.getWithdrawal(FAILED_REFERENCE_ID),
       ).rejects.toThrow();
     });
   });
@@ -220,13 +226,13 @@ describe("Collections", function () {
   describe("sendDeliveryNotification", function () {
     it("sends notificationMessage as a header", async function () {
       await expect(
-        collections.sendDeliveryNotification("ref1", {
+        collections.sendDeliveryNotification(VALID_REFERENCE_ID, {
           notificationMessage: "Delivered",
         }),
       ).resolves.toBeUndefined();
       expect(mockAdapter.history.post).toHaveLength(1);
       expect(mockAdapter.history.post[0]?.url).toBe(
-        "/collection/v1_0/requesttopay/ref1/deliverynotification",
+        `/collection/v1_0/requesttopay/${VALID_REFERENCE_ID}/deliverynotification`,
       );
       // notificationMessage should be a header, not a body
       expect(mockAdapter.history.post[0]?.headers?.notificationMessage).toBe(
@@ -238,7 +244,7 @@ describe("Collections", function () {
 
     it("includes Language header when specified", async function () {
       await expect(
-        collections.sendDeliveryNotification("ref1", {
+        collections.sendDeliveryNotification(VALID_REFERENCE_ID, {
           notificationMessage: "Delivered",
           language: "en",
         }),
@@ -302,7 +308,9 @@ describe("Collections", function () {
 
   describe("getUserInfoWithConsent", function () {
     it("makes the correct request", async function () {
-      await expect(collections.getUserInfoWithConsent()).resolves.toBeDefined();
+      await expect(
+        collections.getUserInfoWithConsent("consent-token"),
+      ).resolves.toBeDefined();
       expect(mockAdapter.history.get).toHaveLength(1);
       expect(mockAdapter.history.get[0]?.url).toBe(
         "/collection/oauth2/v1_0/userinfo",

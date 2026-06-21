@@ -1,4 +1,5 @@
 import * as momo from "../src";
+import { logSafeError } from "./safe-error.ts";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -30,6 +31,7 @@ async function main(): Promise<void> {
   }
 
   const transactionId = await disbursements.transfer({
+    referenceId: momo.generateReferenceId(),
     amount: "100",
     currency: "EUR",
     externalId: "947354",
@@ -45,13 +47,17 @@ async function main(): Promise<void> {
   console.log({ transactionId });
 
   const transaction = await disbursements.getTransaction(transactionId);
-  console.log({ transaction });
+  console.log({
+    referenceId: transactionId,
+    status: transaction.status,
+    financialTransactionId: transaction.financialTransactionId,
+  });
 
   const accountBalance = await disbursements.getBalance();
   console.log({ accountBalance });
 }
 
 main().catch((error) => {
-  console.error(error);
+  logSafeError(error);
   process.exitCode = 1;
 });

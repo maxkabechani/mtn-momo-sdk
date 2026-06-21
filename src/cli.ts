@@ -2,9 +2,8 @@
 
 import { program } from "commander";
 
-import * as momo from "./index";
-import type { Credentials } from "./common";
-import type { MtnMoMoError } from "./errors";
+import * as momo from "./index.js";
+import type { Credentials } from "./common.js";
 
 const version = process.env.npm_package_version || "0.0.0";
 
@@ -40,6 +39,9 @@ users
       );
     });
   })
-  .catch((error: MtnMoMoError) => {
-    console.log(error);
+  .catch((error: unknown) => {
+    const name = error instanceof Error ? error.name : "Error";
+    const message = error instanceof Error ? error.message : "Request failed";
+    console.error(`${name}: ${message}`);
+    process.exitCode = 1;
   });

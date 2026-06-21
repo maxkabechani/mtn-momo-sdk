@@ -1,111 +1,107 @@
-import { strictEqual } from "assert";
+import type { PaymentRequest } from "./collections.js";
+import {
+  Environment,
+  type CashTransferRequest,
+  type DepositRequest,
+  type GlobalConfig,
+  type ProductConfig,
+  type RefundRequest,
+  type SubscriptionConfig,
+  type UserConfig,
+  type WithdrawalRequest,
+} from "./common.js";
+import type { TransferRequest } from "./disbursements.js";
+import {
+  pathUuid,
+  requireUuidV4,
+  validateCurrency,
+  validateFinancialAmount,
+  validateGlobalSecurityConfig,
+  validateParty,
+} from "./security.js";
 
-import type { PaymentRequest } from "./collections";
-import type { WithdrawalRequest, DepositRequest, RefundRequest } from "./common";
-import { Environment } from "./common";
-import type {
-  GlobalConfig,
-  ProductConfig,
-  SubscriptionConfig,
-  UserConfig,
-} from "./common";
-import type { TransferRequest } from "./disbursements";
+function requireString(value: unknown, name: string): asserts value is string {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new TypeError(`${name} is required`);
+  }
+}
 
-export function validateRequestToPay(
-  paymentRequest: PaymentRequest,
+export async function validateRequestToPay(
+  request: PaymentRequest,
 ): Promise<void> {
-  const { amount, currency, payer }: PaymentRequest = paymentRequest || {};
-  return Promise.resolve().then(() => {
-    strictEqual(isTruthy(amount), true, "amount is required");
-    strictEqual(isNumeric(amount), true, "amount must be a number");
-    strictEqual(isTruthy(currency), true, "currency is required");
-    strictEqual(isTruthy(payer), true, "payer is required");
-    strictEqual(isTruthy(payer.partyId), true, "payer.partyId is required");
-    strictEqual(
-      isTruthy(payer.partyIdType),
-      true,
-      "payer.partyIdType is required",
-    );
-    strictEqual(isString(currency), true, "currency must be a string");
-  });
+  const { amount, currency, payer, referenceId } = request || {};
+  validateFinancialAmount(amount);
+  validateCurrency(currency);
+  validateParty(payer, "payer");
+  if (referenceId !== undefined) requireUuidV4(referenceId);
 }
 
-export function validateWithdrawalRequest(request: WithdrawalRequest): Promise<void> {
-  const { amount, currency, payee } = request || {};
-  return Promise.resolve().then(() => {
-    strictEqual(isTruthy(amount), true, "amount is required");
-    strictEqual(isNumeric(amount), true, "amount must be a number");
-    strictEqual(isTruthy(currency), true, "currency is required");
-    strictEqual(isTruthy(payee), true, "payee is required");
-    strictEqual(isTruthy(payee?.partyId), true, "payee.partyId is required");
-    strictEqual(isTruthy(payee?.partyIdType), true, "payee.partyIdType is required");
-    strictEqual(isString(currency), true, "currency must be a string");
-  });
-}
-
-export function validateDepositRequest(request: DepositRequest): Promise<void> {
-  const { amount, currency, payee } = request || {};
-  return Promise.resolve().then(() => {
-    strictEqual(isTruthy(amount), true, "amount is required");
-    strictEqual(isNumeric(amount), true, "amount must be a number");
-    strictEqual(isTruthy(currency), true, "currency is required");
-    strictEqual(isTruthy(payee), true, "payee is required");
-    strictEqual(isTruthy(payee?.partyId), true, "payee.partyId is required");
-    strictEqual(isTruthy(payee?.partyIdType), true, "payee.partyIdType is required");
-    strictEqual(isString(currency), true, "currency must be a string");
-  });
-}
-
-export function validateRefundRequest(request: RefundRequest): Promise<void> {
-  const { amount, currency, referenceIdToRefund } = request || {};
-  return Promise.resolve().then(() => {
-    strictEqual(isTruthy(referenceIdToRefund), true, "referenceIdToRefund is required");
-    strictEqual(isUuid4(referenceIdToRefund), true, "referenceIdToRefund must be a valid uuid v4");
-    strictEqual(isTruthy(amount), true, "amount is required");
-    strictEqual(isNumeric(amount), true, "amount must be a number");
-    strictEqual(isTruthy(currency), true, "currency is required");
-    strictEqual(isString(currency), true, "currency must be a string");
-  });
-}
-
-export function validateTransfer(
-  payoutRequest: TransferRequest,
+export async function validateWithdrawalRequest(
+  request: WithdrawalRequest,
 ): Promise<void> {
-  const { amount, currency, payee, referenceId }: TransferRequest =
-    payoutRequest || {};
-  return Promise.resolve().then(() => {
-    strictEqual(isTruthy(referenceId), true, "referenceId is required");
-    strictEqual(
-      isUuid4(referenceId as string),
-      true,
-      "referenceId must be a valid uuid v4",
-    );
-    strictEqual(isTruthy(amount), true, "amount is required");
-    strictEqual(isNumeric(amount), true, "amount must be a number");
-    strictEqual(isTruthy(currency), true, "currency is required");
-    strictEqual(isTruthy(payee), true, "payee is required");
-    strictEqual(isTruthy(payee.partyId), true, "payee.partyId is required");
-    strictEqual(
-      isTruthy(payee.partyIdType),
-      true,
-      "payee.partyIdType is required",
-    );
-    strictEqual(isString(currency), true, "amount must be a string");
-  });
+  const { amount, currency, payee, referenceId } = request || {};
+  validateFinancialAmount(amount);
+  validateCurrency(currency);
+  validateParty(payee, "payee");
+  if (referenceId !== undefined) requireUuidV4(referenceId);
+}
+
+export async function validateDepositRequest(
+  request: DepositRequest,
+): Promise<void> {
+  const { amount, currency, payee, referenceId } = request || {};
+  validateFinancialAmount(amount);
+  validateCurrency(currency);
+  validateParty(payee, "payee");
+  if (referenceId !== undefined) requireUuidV4(referenceId);
+}
+
+export async function validateRefundRequest(
+  request: RefundRequest,
+): Promise<void> {
+  const { amount, currency, referenceIdToRefund, referenceId } = request || {};
+  pathUuid(referenceIdToRefund, "referenceIdToRefund");
+  validateFinancialAmount(amount);
+  validateCurrency(currency);
+  if (referenceId !== undefined) requireUuidV4(referenceId);
+}
+
+export async function validateTransfer(request: TransferRequest): Promise<void> {
+  const { amount, currency, payee, referenceId } = request || {};
+  validateFinancialAmount(amount);
+  validateCurrency(currency);
+  validateParty(payee, "payee");
+  if (referenceId !== undefined) requireUuidV4(referenceId);
+}
+
+export async function validateCashTransferRequest(
+  request: CashTransferRequest,
+): Promise<void> {
+  const { amount, currency, payee, referenceId } = request || {};
+  validateFinancialAmount(amount);
+  validateCurrency(currency);
+  validateParty(payee, "payee");
+  if (referenceId !== undefined) requireUuidV4(referenceId);
+
+  if (request.originalAmount !== undefined) {
+    validateFinancialAmount(request.originalAmount, "originalAmount");
+  }
+  if (request.originalCurrency !== undefined) {
+    validateCurrency(request.originalCurrency);
+  }
 }
 
 export function validateGlobalConfig(config: GlobalConfig): void {
-  const { callbackHost, baseUrl, environment } = config;
-  strictEqual(isTruthy(callbackHost), true, "callbackHost is required");
+  requireString(config?.callbackHost, "callbackHost");
 
-  if (environment && environment !== Environment.SANDBOX) {
-    strictEqual(
-      isTruthy(baseUrl),
-      true,
-      "baseUrl is required if environment is not sandbox",
-    );
-    strictEqual(isString(baseUrl), true, "baseUrl must be a string");
+  if (
+    config.environment === Environment.PRODUCTION &&
+    config.baseUrl === undefined
+  ) {
+    throw new TypeError("baseUrl is required if environment is not sandbox");
   }
+
+  validateGlobalSecurityConfig(config);
 }
 
 export function validateProductConfig(config: ProductConfig): void {
@@ -114,35 +110,11 @@ export function validateProductConfig(config: ProductConfig): void {
 }
 
 export function validateSubscriptionConfig(config: SubscriptionConfig): void {
-  const { primaryKey } = config;
-  strictEqual(isTruthy(primaryKey), true, "primaryKey is required");
-  strictEqual(isString(primaryKey), true, "primaryKey must be a string");
+  requireString(config?.primaryKey, "primaryKey");
 }
 
-export function validateUserConfig({ userId, userSecret }: UserConfig): void {
-  strictEqual(isTruthy(userId), true, "userId is required");
-  strictEqual(isString(userId), true, "userId must be a string");
-
-  strictEqual(isTruthy(userSecret), true, "userSecret is required");
-  strictEqual(isString(userSecret), true, "userSecret must be a string");
-
-  strictEqual(isUuid4(userId), true, "userId must be a valid uuid v4");
-}
-
-function isNumeric(value: any): boolean {
-  return !isNaN(parseInt(value, 10));
-}
-
-function isTruthy(value: any): boolean {
-  return !!value;
-}
-
-function isString(value: any): boolean {
-  return typeof value === "string";
-}
-
-function isUuid4(value: string): boolean {
-  return /^[0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}$/i.test(
-    value,
-  );
+export function validateUserConfig(config: UserConfig): void {
+  requireString(config?.userId, "userId");
+  requireString(config?.userSecret, "userSecret");
+  requireUuidV4(config.userId, "userId");
 }

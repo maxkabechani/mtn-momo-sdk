@@ -9,7 +9,7 @@ import { Environment } from "../src/common";
 describe("Client", function () {
   const config: Config = {
     environment: Environment.SANDBOX,
-    baseUrl: "test",
+    baseUrl: "https://example.test",
     primaryKey: "key",
     userId: "id",
     userSecret: "secret",
